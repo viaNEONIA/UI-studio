@@ -56,3 +56,15 @@ test('grid, zoom, overflow audit, stretch constraints and screenshot',async({pag
  await page.locator('#pX').fill('-10');await expect(page.locator('#layoutAudit')).toContainText('画面外の部品 1 件');await page.locator('#fitZoom').click();
  await page.screenshot({path:testInfo.outputPath('editor.png'),fullPage:true});
 });
+test('invalid dimensions do not corrupt data; click-only selection keeps undo history',async({page})=>{
+ await load(page,project());await page.locator('[data-id="a"]').click();await page.locator('#pW').fill('0');expect((await saved(page)).screens[0].elements[0].w).toBe(100);
+ await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(0);
+});
+test('screen deletion clears incoming links and undo restores them',async({page})=>{
+ const p=project();p.screens.push({id:'s2',name:'別画面',elements:[]});p.screens[0].elements[0].link='s2';await load(page,p);
+ await page.locator('#screens .screenrow').nth(1).getByTitle('画面を削除').click();expect((await saved(page)).screens[0].elements[0].link).toBe('');await page.locator('#undo').click();expect(await saved(page)).toEqual(p);
+});
+test('fit includes large canvas below 50 percent',async({page})=>{
+ const p=project();p.width=1600;p.height=2400;await load(page,p);await page.locator('#fitZoom').click();
+ const d=await page.locator('#deviceWrap').boundingBox(),w=await page.locator('#workspace').boundingBox();expect(d.width).toBeLessThan(w.width);expect(d.height).toBeLessThan(w.height);
+});
