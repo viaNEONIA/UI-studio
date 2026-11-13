@@ -12,7 +12,6 @@ test('all 23 components add; undo, redo, delete',async({page})=>{
   await expect(page.locator('.element')).toHaveCount(23);
   await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(22);
   await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(23);
-  await page.locator('#delete').click(); // restore clears selection
   await page.locator('#layers button').first().click();await page.keyboard.press('Delete');await expect(page.locator('.element')).toHaveCount(22);
 });
 test('drag and resize use canvas coordinates',async({page})=>{
@@ -44,7 +43,7 @@ test('screen editing, copy/paste, order and links in exported HTML',async({page}
  await load(page,project());await page.locator('#duplicateScreen').click();await expect(page.locator('#screens .screenrow')).toHaveCount(2);
  await page.locator('#layers button').click();await page.keyboard.press('Control+c');await page.keyboard.press('Control+v');await expect(page.locator('.element')).toHaveCount(2);
  await page.locator('#layerDown').click();await page.locator('#pLink').selectOption('s1');
- const html=await download(page,'#exportHtml');await page.setContent(html);await page.locator('nav button').nth(1).click();await expect(page.locator('.screen.visible')).toHaveCount(1);await page.locator('.screen.visible .item[data-link]').click();await expect(page.locator('#s1')).toHaveClass('screen visible');
+ const html=await download(page,'#exportHtml');await page.setContent(html);await page.locator('nav button').nth(1).click();await expect(page.locator('.screen.visible')).toHaveCount(1);await page.locator('.screen.visible .item[data-link]').click({position:{x:95,y:30}});await expect(page.locator('#s1')).toHaveClass('screen visible');
 });
 test('export escapes arbitrary screen IDs and sandboxes HTML',async({page})=>{
  const p=project();p.screens[0].id="x'\"><img src=x onerror=window.injected=1>";p.screens[0].elements[0].type='html';p.screens[0].elements[0].text='<script>parent.injected=1</script>';
