@@ -26,7 +26,7 @@ version:1、プロジェクト・画面・要素の構造は変更しない。an
 - npm test
 - npx playwright install --with-deps chromium
 - npm run test:e2e
-- BASELINE=1 npm run test:e2e で同じテストを原本に適用できる（回帰修正項目は失敗する想定）。
+- `BASELINE=1 npm run test:e2e -- --grep "group at edge|invalid import|export escapes"` で原本の3不具合を再現する。expected failureとして扱い、予想に反して成功した場合はCI失敗にする。
 - ローカルの既存Chromiumを使う場合: CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e
 
 E2Eは実際のUI入力とJSONダウンロード内容を照合する。追加、移動、リサイズ、複数選択、グループ、整列、Undo/Redo、JSON互換、不正JSON、画面複製、コピー、レイヤー、出力HTMLのリンク、HTML sandbox、制約、グリッド、倍率、画面外警告を対象とする。

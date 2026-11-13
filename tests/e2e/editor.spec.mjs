@@ -6,7 +6,7 @@ async function load(page, data) { await page.locator('#file').setInputFiles({nam
 async function download(page, id) { const pending=page.waitForEvent('download'); await page.locator(id).click(); return readFile(await (await pending).path(), 'utf8'); }
 async function saved(page) {return JSON.parse(await download(page,'#saveJson'));}
 async function move(page, locator, dx, dy) {const r=await locator.boundingBox();await page.mouse.move(r.x+5,r.y+5);await page.mouse.down();await page.mouse.move(r.x+5+dx*.65,r.y+5+dy*.65,{steps:5});await page.mouse.up();}
-test.beforeEach(async ({page}) => {await page.goto('/');});
+test.beforeEach(async ({page}, testInfo) => {if(process.env.BASELINE && /group at edge|invalid import|export escapes/.test(testInfo.title))test.fail(true,'Original v0.6 regression reproduction');await page.goto('/');});
 test('all 23 components add; undo, redo, delete',async({page})=>{
   const buttons=page.locator('#components button');for(let i=0;i<await buttons.count();i++)await buttons.nth(i).click();
   await expect(page.locator('.element')).toHaveCount(23);
