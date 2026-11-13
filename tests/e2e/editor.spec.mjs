@@ -36,7 +36,7 @@ test('legacy JSON without anchors round trips including extension metadata',asyn
  await page.locator('#undo').click();expect((await saved(page)).width).toBe(412);
 });
 test('invalid import leaves current project intact',async({page})=>{
- await load(page,project());const before=await saved(page);const bad=project();bad.screens[0].elements[0].text=null;
+ await load(page,project());const before=await saved(page);const bad=project();bad.screens[0].elements[0].text=null;bad.screens[0].elements[0].type='image';
  const dialog=page.waitForEvent('dialog');await load(page,bad);await (await dialog).accept();expect(await saved(page)).toEqual(before);
 });
 test('screen editing, copy/paste, order and links in exported HTML',async({page})=>{

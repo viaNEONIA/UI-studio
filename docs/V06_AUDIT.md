@@ -31,7 +31,7 @@ version:1、プロジェクト・画面・要素の構造は変更しない。an
 
 E2Eは実際のUI入力とJSONダウンロード内容を照合する。追加、移動、リサイズ、複数選択、グループ、整列、Undo/Redo、JSON互換、不正JSON、画面複製、コピー、レイヤー、出力HTMLのリンク、HTML sandbox、制約、グリッド、倍率、画面外警告を対象とする。
 
-ローカルのnpm testは3件合格。Chromiumはホストのsocket作成制限で起動できず、ブラウザ配布物の取得も失敗。ブラウザ結果はPRのCIで確認する。スクリーンショットはE2Eのtest-resultsに出力し、CI artifactとして14日保持する。
+ローカルのnpm testは3件合格。Chromiumはホストのsocket作成制限で起動できず、ブラウザ配布物の取得も失敗。GitHub ActionsのChromiumでは修正後の11シナリオが全件合格（run 43528225074、43528305926）。原本のグループ移動とHTML出力の不具合も再現済み。不正JSONの原本再現は画像要素のtext:nullで確認する。スクリーンショットはE2Eのtest-resultsに出力し、CI artifactとして14日保持する。
 
 未検証: Edge/Firefox/WebKit、file://での手動操作、タッチ実機、外部画像のネットワーク挙動、全CSS宣言の描画、非常に大きなJSON、手動による詳細な視覚検査。HTML iframeのsandboxはスクリプトを禁止するが、外部リソースの通信を遮断する仕組みではない。
 
