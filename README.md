@@ -29,11 +29,11 @@ GitHub Pagesを有効にした場合は、リポジトリの公開URLでも利�
 
 ## GitHub Pages
 
-Settings → Pages → Build and deployment → Source: **GitHub Actions** を選択してください。`main` へのpushで `.github/workflows/pages.yml` が実行されます。公開URLは通常 `https://viaNEONIA.github.io/UI-Studio/` です（公開設定に依存）。
+Settings → Pages → Build and deployment → Source: **GitHub Actions** を選択してください。`main` へのpushで `.github/workflows/pages.yml` が実行されます。公開URLは通常 `https://viaNEONIA.github.io/UI-studio/` です（公開設定に依存）。
 
 ## テスト
 
-Node.js 22以上で `npm test`。現状は構造・JavaScript構文・基準ファイル同一性の簡易チェックです。ブラウザでのドラッグ操作などのE2Eテストは未整備です。
+Node.js 22以上で `npm ci && npm test`。Chromium E2Eは `npx playwright install --with-deps chromium` 後に `npm run test:e2e`。実行範囲・制限・監査結果は [`docs/V06_AUDIT.md`](docs/V06_AUDIT.md) を参照してください。
 
 ## Workへの引継ぎ
 
