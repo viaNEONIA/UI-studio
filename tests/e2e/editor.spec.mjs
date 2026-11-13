@@ -89,7 +89,7 @@ test('screen add rename switch and last-screen deletion guard',async({page})=>{
  await page.locator('#newScreen').click();await expect(page.locator('#screens .screenrow')).toHaveCount(2);
  page.once('dialog',dialog=>dialog.accept('変更した画面'));await page.locator('#screens .screenrow').nth(1).locator('button').first().dblclick();
  await expect(page.locator('#screens')).toContainText('変更した画面');await page.locator('#screens .screenrow').nth(0).getByTitle('画面を削除').click();
- const pending=page.waitForEvent('dialog');await page.locator('#screens').getByTitle('画面を削除').click();await (await pending).accept();expect((await saved(page)).screens).toHaveLength(1);
+ let message='';page.once('dialog',async dialog=>{message=dialog.message();await dialog.accept()});await page.locator('#screens').getByTitle('画面を削除').click();expect(message).toContain('最後の画面');expect((await saved(page)).screens).toHaveLength(1);
 });
 test('local file launch supports import edit and JSON download',async({page})=>{
  const { pathToFileURL }=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/index.html').href);
