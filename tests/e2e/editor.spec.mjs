@@ -68,3 +68,30 @@ test('fit includes large canvas below 50 percent',async({page})=>{
  const p=project();p.width=1600;p.height=2400;await load(page,p);await page.locator('#fitZoom').click();
  const d=await page.locator('#deviceWrap').boundingBox(),w=await page.locator('#workspace').boundingBox();expect(d.width).toBeLessThan(w.width);expect(d.height).toBeLessThan(w.height);
 });
+test('ungrouped multiple selection drags together and undoes once',async({page})=>{
+ await load(page,project([element('a',20),element('b',150)]));await page.locator('#snapOn').uncheck();
+ await page.locator('#layers button').nth(0).click();await page.locator('#layers button').nth(1).click({modifiers:['Control']});
+ await move(page,page.locator('[data-id="a"]'),30,25);expect((await saved(page)).screens[0].elements.map(e=>[e.x,e.y])).toEqual([[50,65],[180,65]]);
+ await page.locator('#undo').click();expect((await saved(page)).screens[0].elements.map(e=>[e.x,e.y])).toEqual([[20,40],[150,40]]);
+});
+test('smart guides snap within six pixels and clear on release',async({page})=>{
+ await load(page,project());await move(page,page.locator('.element'),-16,30);expect((await saved(page)).screens[0].elements[0].x).toBe(0);await expect(page.locator('.guide')).toHaveCount(0);
+});
+test('all constraint modes across screens; disabling constraints preserves geometry',async({page})=>{
+ const p=project(['left','center','right','stretch'].map((a,i)=>({...element('e'+i,20),anchorX:a,anchorY:['top','center','bottom','stretch'][i]})));
+ p.screens.push({id:'s2',name:'ダミー2',elements:[{...element('other'),anchorX:'right',anchorY:'bottom'}]});await load(page,p);
+ await page.locator('#preset').selectOption('430,932');const result=await saved(page);
+ expect(result.screens[0].elements.map(e=>[e.x,e.y,e.w,e.h])).toEqual([[20,40,100,48],[29,49,100,48],[38,57,100,48],[20,40,118,65]]);
+ expect(result.screens[1].elements[0].x).toBe(38);
+ await page.locator('#autoLayoutOn').uncheck();await page.locator('#preset').selectOption('768,1024');expect((await saved(page)).screens).toEqual(result.screens);
+});
+test('screen add rename switch and last-screen deletion guard',async({page})=>{
+ await page.locator('#newScreen').click();await expect(page.locator('#screens .screenrow')).toHaveCount(2);
+ page.once('dialog',dialog=>dialog.accept('変更した画面'));await page.locator('#screens .screenrow').nth(1).locator('button').first().dblclick();
+ await expect(page.locator('#screens')).toContainText('変更した画面');await page.locator('#screens .screenrow').nth(0).getByTitle('画面を削除').click();
+ const pending=page.waitForEvent('dialog');await page.locator('#screens').getByTitle('画面を削除').click();await (await pending).accept();expect((await saved(page)).screens).toHaveLength(1);
+});
+test('local file launch supports import edit and JSON download',async({page})=>{
+ const { pathToFileURL }=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/index.html').href);
+ await load(page,project());await page.locator('#layers button').click();await page.locator('#pText').fill('ローカル動作確認');expect((await saved(page)).screens[0].elements[0].text).toBe('ローカル動作確認');
+});
