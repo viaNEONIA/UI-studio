@@ -124,3 +124,15 @@ test('straight line and arrow finish at two points, undo and cancellation',async
  await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(1);await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(2);
  await page.locator('#drawPolyline').click();await page.mouse.click(r.x+30,r.y+300);await page.locator('#cancelDrawing').click();await expect(page.locator('.drawing-preview')).toHaveCount(0);await expect(page.locator('.element')).toHaveCount(2);
 });
+for(const type of ['line','arrow','polyline','curve']){
+ test(`${type} vertex drag preserves other points, undo and JSON/export`,async({page})=>{
+  const points=['line','arrow'].includes(type)?[[0,0],[1,1]]:[[0,0],[.5,1],[1,0]];
+  const p=project([{...element('v',80),type,y:100,w:160,h:100,points,stroke:'#2563eb',strokeWidth:5}]);
+  await load(page,p);await page.locator('#layers button').click();await expect(page.locator('.vertex')).toHaveCount(points.length);
+  const world=e=>e.points.map(([x,y])=>[e.x+x*e.w,e.y+y*e.h]);const before=world(p.screens[0].elements[0]);
+  const handle=page.locator('.vertex').first(),r=await handle.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2-26,r.y+r.height/2+13,{steps:4});await page.mouse.up();
+  const after=await saved(page),positions=world(after.screens[0].elements[0]);expect(positions[0][0]).toBeCloseTo(before[0][0]-40);expect(positions[0][1]).toBeCloseTo(before[0][1]+20);expect(positions.slice(1)).toEqual(before.slice(1));
+  await page.locator('#undo').click();expect(await saved(page)).toEqual(p);await page.locator('#redo').click();expect(await saved(page)).toEqual(after);
+  await load(page,after);expect(await saved(page)).toEqual(after);const html=await download(page,'#exportHtml');await page.setContent(html);await expect(page.locator('svg')).toHaveCount(1);await expect(page.locator('.vertex')).toHaveCount(0);
+ });
+}
