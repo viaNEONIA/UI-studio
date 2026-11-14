@@ -1,0 +1,36 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+import JSZip from 'jszip';
+async function download(page,id){const waiting=page.waitForEvent('download');await page.locator(id).click();return readFile(await(await waiting).path())}
+async function saved(page){return JSON.parse((await download(page,'#saveJson')).toString())}
+const item=(id,type,x,y,w,h,extra={})=>({id,type,name:id==='wire'?'接続線':'相手部品',x,y,w,h,text:'',bg:'#dbeafe',color:'#172235',font:16,radius:0,...extra});
+const wire=()=>item('wire','line',80,100,100,60,{bg:'transparent',stroke:'#172235',strokeWidth:3,points:[[0,0],[1,1]]});
+const data=(extra={})=>({version:1,width:800,height:700,screens:[{id:'s',name:'接続',elements:[item('box','box',300,220,180,120,extra),wire()]}]});
+async function load(page,p=data()){await page.locator('#file').setInputFiles({name:'snap.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await page.locator('#layers .layer').filter({hasText:'接続線'}).click();await page.locator('#snapOn').uncheck()}
+async function screenPoint(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());return {x:r.x+(x+2)*z,y:r.y+(y+2)*z}}
+async function beginDrag(page){const r=await page.locator('[data-id="wire"] .vertex').last().boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down()}
+const positions=e=>e.points.map(([x,y])=>[e.x+x*e.w,e.y+y*e.h]);
+test.beforeEach(async({page})=>{await page.goto('/')});
+for(const [name,w,h,mm]of [['A2 縦',1587,2245,[420,594]],['A2 横',2245,1587,[594,420]],['A1 縦',2245,3179,[594,841]],['A1 横',3179,2245,[841,594]]])test(name+' fits and retains exact output paper size',async({page})=>{
+ await page.locator('#preset').selectOption(w+','+h);const p=await saved(page);expect([p.width,p.height]).toEqual([w,h]);expect(await page.evaluate(([w,h])=>window.MeetingTools.paperSize(w,h),[w,h])).toEqual(mm);const canvas=await page.locator('#deviceWrap').boundingBox(),work=await page.locator('#workspace').boundingBox();expect(canvas.width).toBeLessThan(work.width);expect(canvas.height).toBeLessThan(work.height);await page.locator('#file').setInputFiles({name:'paper.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});expect(await saved(page)).toEqual(p);
+});
+test('free canvas size accepts small and large dimensions and rejects invalid changes atomically',async({page})=>{
+ for(const [w,h]of [[4500,2800],[120,90]]){await page.locator('#preset').selectOption('custom');await page.locator('#canvasW').fill(String(w));await page.locator('#canvasH').fill(String(h));await page.locator('#applySize').click();const p=await saved(page);expect([p.width,p.height]).toEqual([w,h])}
+ const before=await saved(page);await page.locator('#canvasW').fill('20001');const dialog=page.waitForEvent('dialog');await page.locator('#applySize').click();await(await dialog).accept();expect(await saved(page)).toEqual(before);
+});
+test('A1 and A2 PDF and PPTX preserve physical page dimensions',async({page})=>{
+ test.setTimeout(120000);for(const [preset,w,h]of [['1587,2245',420,594],['3179,2245',841,594]]){await page.locator('#preset').selectOption(preset);const pdf=(await download(page,'#exportPdf')).toString('latin1'),match=pdf.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);expect(match).not.toBeNull();expect(Number(match[1])).toBeCloseTo(w*72/25.4,2);expect(Number(match[2])).toBeCloseTo(h*72/25.4,2);const zip=await JSZip.loadAsync(await download(page,'#exportPptx'));expect(await zip.file('ppt/presentation.xml').async('string')).toContain('cx="'+w*36000+'" cy="'+h*36000+'"')}
+});
+for(const zoom of ['0.5','1.5'])for(const [name,point]of [['center',[390,280]],['edge',[300,280]],['third',[360,220]]])test('Ctrl endpoint drag snaps to '+name+' at zoom '+zoom,async({page})=>{
+ await load(page,data({locked:true}));await page.locator('#zoom').selectOption(zoom);const before=await saved(page);await beginDrag(page);await page.keyboard.down('Control');const p=await screenPoint(page,point[0]+5/Number(zoom),point[1]+3/Number(zoom));await page.mouse.move(p.x,p.y,{steps:4});await expect(page.locator('.connection-snap')).toHaveAttribute('data-target','box');await expect(page.locator('[data-id="box"]')).toHaveClass(/snap-target/);await page.mouse.up();await page.keyboard.up('Control');await expect(page.locator('.connection-snap')).toHaveCount(0);const after=await saved(page);expect(positions(after.screens[0].elements[1])[1][0]).toBeCloseTo(point[0],6);expect(positions(after.screens[0].elements[1])[1][1]).toBeCloseTo(point[1],6);expect(positions(after.screens[0].elements[1])[0]).toEqual([80,100]);expect(after.screens[0].elements[0]).toEqual(before.screens[0].elements[0]);await page.locator('#undo').click();expect(await saved(page)).toEqual(before);
+});
+test('releasing Ctrl during a drag removes snap and restores the free pointer position',async({page})=>{
+ await load(page);await beginDrag(page);await page.keyboard.down('Control');const p=await screenPoint(page,397,285);await page.mouse.move(p.x,p.y);await expect(page.locator('.connection-snap')).toHaveCount(1);await page.keyboard.up('Control');await expect(page.locator('.connection-snap')).toHaveCount(0);await page.mouse.up();const end=positions((await saved(page)).screens[0].elements[1])[1];expect(end[0]).toBeCloseTo(397,1);expect(end[1]).toBeCloseTo(285,1);
+});
+test('Ctrl ignores the line being edited and snaps to thirds of another line',async({page})=>{
+ const p=data();p.screens[0].elements[0]=item('box','line',300,300,180,20,{stroke:'#172235',strokeWidth:3,points:[[0,0],[1,0]]});await load(page,p);await beginDrag(page);await page.keyboard.down('Control');let target=await screenPoint(page,130,130);await page.mouse.move(target.x,target.y);await expect(page.locator('.connection-snap')).toHaveCount(0);target=await screenPoint(page,364,303);await page.mouse.move(target.x,target.y);await expect(page.locator('.connection-snap')).toHaveAttribute('data-label','線の三分割点');await page.mouse.up();await page.keyboard.up('Control');const end=positions((await saved(page)).screens[0].elements[1])[1];expect(end[0]).toBeCloseTo(360,6);expect(end[1]).toBeCloseTo(300,6);
+});
+test('Ctrl drawing snaps both click endpoints and Shift keeps the horizontal constraint',async({page})=>{
+ await load(page);await page.locator('#drawArrow').click();await page.keyboard.down('Control');let p=await screenPoint(page,395,284);await page.mouse.click(p.x,p.y);p=await screenPoint(page,304,283);await page.mouse.click(p.x,p.y);await page.keyboard.up('Control');const elements=(await saved(page)).screens[0].elements,endpoints=positions(elements[2]);expect(endpoints).toEqual([[390,280],[300,280]]);
+ const next=data();next.screens[0].elements[1].y=280;await load(page,next);await beginDrag(page);await page.keyboard.down('Shift');await page.keyboard.down('Control');p=await screenPoint(page,396,284);await page.mouse.move(p.x,p.y);await expect(page.locator('.connection-snap')).toHaveCount(1);await page.mouse.up();await page.keyboard.up('Control');await page.keyboard.up('Shift');const snapped=positions((await saved(page)).screens[0].elements[1]);expect(snapped[0]).toEqual([80,280]);expect(snapped[1]).toEqual([390,280]);
+});
