@@ -7,12 +7,12 @@ async function download(page, id) { const pending=page.waitForEvent('download');
 async function saved(page) {return JSON.parse(await download(page,'#saveJson'));}
 async function move(page, locator, dx, dy) {const r=await locator.boundingBox();await page.mouse.move(r.x+5,r.y+5);await page.mouse.down();await page.mouse.move(r.x+5+dx*.65,r.y+5+dy*.65,{steps:5});await page.mouse.up();}
 test.beforeEach(async ({page}, testInfo) => {if(process.env.BASELINE && /group at edge|invalid import|export escapes/.test(testInfo.title))test.fail(true,'Original v0.6 regression reproduction');await page.goto('/');});
-test('all 23 components add; undo, redo, delete',async({page})=>{
-  const buttons=page.locator('#components button');for(let i=0;i<await buttons.count();i++)await buttons.nth(i).click();
-  await expect(page.locator('.element')).toHaveCount(23);
-  await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(22);
-  await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(23);
-  await page.locator('#layers button').first().click();await page.keyboard.press('Delete');await expect(page.locator('.element')).toHaveCount(22);
+test('all components add; undo, redo, delete',async({page})=>{
+  const buttons=page.locator('#components button'),count=await buttons.count();for(let i=0;i<await buttons.count();i++)await buttons.nth(i).click();
+  await expect(page.locator('.element')).toHaveCount(count);
+  await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(count-1);
+  await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(count);
+  await page.locator('#layers button').first().click();await page.keyboard.press('Delete');await expect(page.locator('.element')).toHaveCount(count-1);
 });
 test('drag and resize use canvas coordinates',async({page})=>{
   await load(page,project());await page.locator('#snapOn').uncheck();
@@ -106,3 +106,21 @@ for(const [label,w,h] of [['A4 縦',794,1123],['A4 横',1123,794],['A3 縦',1123
   expect(await page.locator('.screen').evaluate(n=>n.style.width)).toBe(`${w}px`);
  });
 }
+
+test('draw polyline and curve, adjust stroke palette and export SVG',async({page})=>{
+ const r=await page.locator('#device').boundingBox();const click=async(x,y)=>page.mouse.click(r.x+(x+2)*.65,r.y+(y+2)*.65);
+ await page.locator('#drawPolyline').click();await click(30,50);await click(180,80);await click(100,200);await page.locator('#finishDrawing').click();
+ let p=await saved(page);expect(p.screens[0].elements[0].type).toBe('polyline');expect(p.screens[0].elements[0].points).toHaveLength(3);
+ await page.locator('#pStrokeWidth').fill('12');await page.locator('#strokePalette button[data-color="#ef4444"]').click();
+ p=await saved(page);expect(p.screens[0].elements[0].strokeWidth).toBe(12);expect(p.screens[0].elements[0].stroke).toBe('#ef4444');
+ await load(page,p);expect(await saved(page)).toEqual(p);
+ await page.locator('#drawCurve').click();await click(40,300);await click(150,400);await click(280,300);await page.locator('#finishDrawing').click();
+ await expect(page.locator('.element svg path').last()).toHaveAttribute('d',/Q/);
+ const html=await download(page,'#exportHtml');await page.setContent(html);await expect(page.locator('svg')).toHaveCount(2);await expect(page.locator('svg g').first()).toHaveAttribute('stroke','#ef4444');
+});
+test('straight line and arrow finish at two points, undo and cancellation',async({page})=>{
+ const r=await page.locator('#device').boundingBox();for(const [id,y]of [['drawLine',80],['drawArrow',200]]){await page.locator('#'+id).click();await page.mouse.click(r.x+30,r.y+y);await page.mouse.click(r.x+180,r.y+y+30)}
+ await expect(page.locator('.element')).toHaveCount(2);await expect(page.locator('.element').last().locator('path')).toHaveCount(2);
+ await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(1);await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(2);
+ await page.locator('#drawPolyline').click();await page.mouse.click(r.x+30,r.y+300);await page.locator('#cancelDrawing').click();await expect(page.locator('.drawing-preview')).toHaveCount(0);await expect(page.locator('.element')).toHaveCount(2);
+});
