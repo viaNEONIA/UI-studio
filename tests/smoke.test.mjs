@@ -23,3 +23,7 @@ test('v0.6 source matches archived baseline', () => {
   const digest = createHash('sha256').update(readFileSync(new URL('fixtures/v0.6.html', import.meta.url))).digest('hex');
   assert.equal(digest, baseline);
 });
+
+test('meeting editor JavaScript parses', () => {
+  new Script(readFileSync(new URL('../src/meeting-editor.js', import.meta.url), 'utf8'));
+});
