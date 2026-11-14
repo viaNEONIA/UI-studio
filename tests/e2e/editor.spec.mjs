@@ -92,7 +92,7 @@ test('screen add rename switch and last-screen deletion guard',async({page})=>{
  let message='';page.once('dialog',async dialog=>{message=dialog.message();await dialog.accept()});await page.locator('#screens').getByTitle('画面を削除').click();expect(message).toContain('最後の画面');expect((await saved(page)).screens).toHaveLength(1);
 });
 test('local file launch supports import edit and JSON download',async({page})=>{
- const { pathToFileURL }=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/index.html').href);
+ const { pathToFileURL }=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
  await load(page,project());await page.locator('#layers button').click();await page.locator('#pText').fill('ローカル動作確認');expect((await saved(page)).screens[0].elements[0].text).toBe('ローカル動作確認');
 });
 for(const [label,w,h] of [['A4 縦',794,1123],['A4 横',1123,794],['A3 縦',1123,1587],['A3 横',1587,1123]]){
