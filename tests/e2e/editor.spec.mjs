@@ -150,8 +150,8 @@ test('background transparency preserves text, color, history and exports',async(
 });
 test('legacy transparent backgrounds remain transparent and can be recolored',async({page})=>{
  await load(page,project([{...element('a'),type:'box',bg:'transparent'}]));await page.locator('#layers button').click();
- await expect(page.locator('#pBgTransparent')).toBeChecked();await page.locator('#pBgTransparent').uncheck();await expect(page.locator('.element')).toHaveCSS('background-color','rgb(255, 255, 255)');
- await setTransparency(page,50);await page.locator('#pBg').evaluate(n=>{n.value='#ff0000';n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}))});await expect(page.locator('.element')).toHaveCSS('background-color','rgba(255, 0, 0, 0.5)');
+ await expect(page.locator('#pBgTransparent')).toBeChecked();await page.locator('#pBgTransparent').uncheck();await expect(page.locator('.element svg g')).toHaveAttribute('fill','#ffffff');
+ await setTransparency(page,50);await page.locator('#pBg').evaluate(n=>{n.value='#ff0000';n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}))});await expect(page.locator('.element svg g')).toHaveAttribute('fill','rgba(255,0,0,0.5)');
 });
 
 async function setTransparency(page,value){await page.locator('#pBgTransparency').evaluate((n,value)=>{n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}))},String(value));}
