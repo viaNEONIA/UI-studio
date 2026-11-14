@@ -24,6 +24,6 @@ test('v0.6 source matches archived baseline', () => {
   assert.equal(digest, baseline);
 });
 
-test('meeting editor JavaScript parses', () => {
-  new Script(readFileSync(new URL('../src/meeting-editor.js', import.meta.url), 'utf8'));
+test('core editor does not depend on build-time handler injection', () => {
+  assert.doesNotMatch(html, /\/\* MEETING_EDITOR \*\//);
 });
