@@ -1,7 +1,7 @@
 # 構成
 
 - `index.html`: 既存エディターのHTML/CSS/JavaScriptソース。会議用ライブラリと編集処理の挿入マーカーを含む。
-- `src/meeting-editor.js`: 最背面背景の管理、取込・出力UI、会議表示、ページ移動、手のひら、自動復旧。ビルド時に既存エディターのスコープへ挿入。
+- 会議・背景管理・画像取込・ページ移動・手のひら・自動復旧の処理は `index.html` に含める。基本操作はビルド時のコード挿入に依存しない。PDF/PPTXライブラリだけをビルド時に同梱する。
 - `src/meeting-tools.mjs`: PDF.jsによる画像化、html2canvasによるページ合成、jsPDFとPptxGenJSによる書き出し。配布版ではMeetingToolsとして利用。
 - `scripts/build.mjs`: esbuildでライブラリとPDF標準フォント/CMap/画像デコーダをまとめ、単独ファイルの`dist/index.html`を生成。第三者ライセンス表示も生成。
 - `tests/fixtures/v0.6.html`: SHA256で照合する旧原本。
