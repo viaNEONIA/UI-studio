@@ -95,3 +95,14 @@ test('local file launch supports import edit and JSON download',async({page})=>{
  const { pathToFileURL }=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/index.html').href);
  await load(page,project());await page.locator('#layers button').click();await page.locator('#pText').fill('ローカル動作確認');expect((await saved(page)).screens[0].elements[0].text).toBe('ローカル動作確認');
 });
+for(const [label,w,h] of [['A4 縦',794,1123],['A4 横',1123,794],['A3 縦',1123,1587],['A3 横',1587,1123]]){
+ test(`${label} canvas fits, round trips and exports correct dimensions`,async({page})=>{
+  await load(page,project());await page.locator('#autoLayoutOn').uncheck();await page.locator('#preset').selectOption(`${w},${h}`);
+  const p=await saved(page);expect([p.width,p.height,p.version]).toEqual([w,h,1]);expect(p.screens[0].elements).toEqual(project().screens[0].elements);
+  const wrap=await page.locator('#deviceWrap').boundingBox(),work=await page.locator('#workspace').boundingBox();expect(wrap.width).toBeLessThan(work.width);expect(wrap.height).toBeLessThan(work.height);
+  await page.locator('#applySize').click();expect((await saved(page)).width).toBe(w);
+  await load(page,p);await expect(page.locator('#preset')).toHaveValue(`${w},${h}`);expect(await saved(page)).toEqual(p);
+  const html=await download(page,'#exportHtml');await page.setContent(html);await expect(page.locator('.screen')).toHaveCSS('height',`${h}px`);
+  expect(await page.locator('.screen').evaluate(n=>n.style.width)).toBe(`${w}px`);
+ });
+}
