@@ -17,7 +17,10 @@ async function readPDF(file,onProgress){
 async function raster(node,width,height){
  if(node.querySelector('iframe'))throw Error('HTML部品を含むページのPDF・PPTX出力には未対応です。HTMLまたはJSONで保存してください');
  for(const img of node.querySelectorAll('img')){if(!img.src.startsWith('data:'))throw Error('PDF・PPTX出力では外部画像URLを使用できません。背景画像として取り込んでください');await img.decode()}
- for(const svg of [...node.querySelectorAll('svg')]){const image=new Image();image.width=svg.viewBox.baseVal.width;image.height=svg.viewBox.baseVal.height;image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(svg));image.style.cssText='width:100%;height:100%;display:block;overflow:visible';svg.replaceWith(image);await image.decode()}
+ for(const svg of [...node.querySelectorAll('svg')]){
+ const box=svg.viewBox.baseVal,group=svg.querySelector('g'),width=Number(group?.getAttribute('stroke-width'))||3,pad=Math.max(24,width*2),surface=document.createElement('canvas');surface.width=Math.ceil((box.width+2*pad)*2);surface.height=Math.ceil((box.height+2*pad)*2);const ctx=surface.getContext('2d');ctx.scale(2,2);ctx.translate(pad,pad);ctx.strokeStyle=group?.getAttribute('stroke')||'#172235';ctx.lineWidth=width;ctx.lineCap='round';ctx.lineJoin='round';for(const path of svg.querySelectorAll('path'))ctx.stroke(new Path2D(path.getAttribute('d')));
+ const image=new Image();image.src=surface.toDataURL('image/png');image.style.cssText=`position:absolute;left:${-pad}px;top:${-pad}px;width:${box.width+2*pad}px;height:${box.height+2*pad}px;display:block;`;svg.replaceWith(image);await image.decode();
+ }
  const canvas=await html2canvas(node,{scale:Math.min(2,3200/Math.max(width,height)),width,height,backgroundColor:'#ffffff',logging:false,allowTaint:false});return canvas.toDataURL('image/png');
 }
 function paperSize(w,h){const preset={'794,1123':[210,297],'1123,794':[297,210],'1123,1587':[297,420],'1587,1123':[420,297]};return preset[w+','+h]||[w*25.4/96,h*25.4/96]}

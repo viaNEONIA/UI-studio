@@ -20,12 +20,13 @@ test('PDF pages become locked bottom backgrounds; edits and full JSON/HTML round
 });
 test('PDF and PPTX export all pages at physical A4 size including backgrounds and SVG',async({page},testInfo)=>{
  test.setTimeout(120000);await page.locator('#preset').selectOption('794,1123');await importPDF(page);
- await page.locator('#components button').getByText('矢印',{exact:true}).click();
+ await page.locator('#components button').getByText('矢印',{exact:true}).click();await page.locator('#pStrokeWidth').fill('3');
  const pdf=await download(page,'#exportPdf');expect(pdf.subarray(0,5).toString()).toBe('%PDF-');const text=pdf.toString('latin1');expect((text.match(/\/Type \/Page\b/g)||[])).toHaveLength(2);expect(text).toMatch(/595\.2\d* 841\.8\d*/);
  const pptx=await download(page,'#exportPptx'),zip=await JSZip.loadAsync(pptx);expect(Object.keys(zip.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n))).toHaveLength(2);expect(Object.keys(zip.files).filter(n=>/^ppt\/media\/.*\.png$/.test(n)).length).toBeGreaterThanOrEqual(2);expect(await zip.file('ppt/presentation.xml').async('string')).toContain('cx="7560000" cy="10692000"');
  const slide=await zip.file('ppt/slides/slide1.xml').async('string');expect(slide).toContain('<p:pic>');
  const media=Object.keys(zip.files).find(n=>/^ppt\/media\/.*\.png$/.test(n));const image=await zip.file(media).async('nodebuffer');await writeFile(testInfo.outputPath('meeting-export.png'),image);await writeFile(testInfo.outputPath('meeting.pdf'),pdf);await writeFile(testInfo.outputPath('meeting.pptx'),pptx);
  const pixel=await page.evaluate(async base64=>{const image=new Image();image.src='data:image/png;base64,'+base64;await image.decode();const c=document.createElement('canvas');c.width=image.width;c.height=image.height;const ctx=c.getContext('2d');ctx.drawImage(image,0,0);return [...ctx.getImageData(50,50,1,1).data]},image.toString('base64'));expect(pixel[0]).toBeGreaterThan(235);expect(pixel[1]).toBeLessThan(230);expect(pixel[2]).toBeLessThan(215);
+ const thickness=await page.evaluate(async base64=>{const im=new Image();im.src='data:image/png;base64,'+base64;await im.decode();const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const ctx=c.getContext('2d');ctx.drawImage(im,0,0);const data=ctx.getImageData(794,1000,1,240).data;let dark=0;for(let i=0;i<data.length;i+=4)if(data[i]<60&&data[i+1]<70&&data[i+2]<80)dark++;return dark},image.toString('base64'));expect(thickness).toBeGreaterThan(3);expect(thickness).toBeLessThan(12);
  // An exported PDF can itself be imported again, preserving both pages.
  await page.locator('#documentFile').setInputFiles({name:'exported.pdf',mimeType:'application/pdf',buffer:pdf});await expect(page.locator('#meetingStatus')).toContainText('2ページを取り込みました',{timeout:60000});expect((await saved(page)).screens).toHaveLength(4);
 });
