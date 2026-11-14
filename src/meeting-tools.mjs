@@ -8,16 +8,16 @@ globalThis.pdfjsWorker=worker;
 class EmbeddedBinaryData { async fetch({kind,filename}) { const encoded=assets[kind+'/'+filename];if(!encoded)throw Error('PDFリソースが見つかりません: '+filename);return Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)); } }
 async function readPDF(file,onProgress){
  if(file.size>50*1024*1024)throw Error('PDFは50MB以内にしてください');
- const task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false,useWorkerFetch:false,BinaryDataFactory:EmbeddedBinaryData,cMapPacked:true,useWasm:false});
- task.onPassword=()=>task.destroy();let pdf;
- try {pdf=await task.promise;if(pdf.numPages>50)throw Error('PDFは50ページ以内にしてください');const pages=[];
+ const task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false,useWorkerFetch:false,BinaryDataFactory:EmbeddedBinaryData,cMapPacked:true,useWasm:true});
+ let rejectPassword;const passwordError=new Promise((resolve,reject)=>rejectPassword=reject);task.onPassword=()=>rejectPassword(Error('パスワード付きPDFには対応していません'));let pdf;
+ try {pdf=await Promise.race([task.promise,passwordError]);if(pdf.numPages>50)throw Error('PDFは50ページ以内にしてください');const pages=[];
  for(let i=1;i<=pdf.numPages;i++){onProgress?.(i,pdf.numPages);const page=await pdf.getPage(i),initial=page.getViewport({scale:1}),scale=Math.min(2,2400/Math.max(initial.width,initial.height)),view=page.getViewport({scale}),canvas=document.createElement('canvas');canvas.width=Math.ceil(view.width);canvas.height=Math.ceil(view.height);await page.render({canvasContext:canvas.getContext('2d'),viewport:view}).promise;pages.push({src:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height});page.cleanup();canvas.width=canvas.height=0;}return pages;
  }finally{await task.destroy()}
 }
 async function raster(node,width,height){
  if(node.querySelector('iframe'))throw Error('HTML部品を含むページのPDF・PPTX出力には未対応です。HTMLまたはJSONで保存してください');
  for(const img of node.querySelectorAll('img')){if(!img.src.startsWith('data:'))throw Error('PDF・PPTX出力では外部画像URLを使用できません。背景画像として取り込んでください');await img.decode()}
- for(const svg of [...node.querySelectorAll('svg')]){const image=new Image();image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(svg));image.style.cssText='width:100%;height:100%;display:block;overflow:visible';svg.replaceWith(image);await image.decode()}
+ for(const svg of [...node.querySelectorAll('svg')]){const image=new Image();image.width=svg.viewBox.baseVal.width;image.height=svg.viewBox.baseVal.height;image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(svg));image.style.cssText='width:100%;height:100%;display:block;overflow:visible';svg.replaceWith(image);await image.decode()}
  const canvas=await html2canvas(node,{scale:Math.min(2,3200/Math.max(width,height)),width,height,backgroundColor:'#ffffff',logging:false,allowTaint:false});return canvas.toDataURL('image/png');
 }
 function paperSize(w,h){const preset={'794,1123':[210,297],'1123,794':[297,210],'1123,1587':[297,420],'1587,1123':[420,297]};return preset[w+','+h]||[w*25.4/96,h*25.4/96]}
