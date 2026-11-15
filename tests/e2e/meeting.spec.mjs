@@ -36,7 +36,7 @@ test('invalid PDF import is atomic and meeting controls navigate and preserve ed
  await importPDF(page);await page.locator('#meetingMode').click();await expect(page.locator('aside.left')).toBeHidden();await page.locator('#nextPage').click();await expect(page.locator('#pageCount')).toHaveText('2 / 2');await page.locator('#previousPage').click();await expect(page.locator('#pageCount')).toHaveText('1 / 2');await page.locator('#meetingMode').click();await expect(page.locator('aside.left')).toBeVisible();
 });
 test('local recovery preserves embedded backgrounds across reload',async({page})=>{
- await importPDF(page);await expect(page.locator('#recoveryStatus')).toContainText('保存済み',{timeout:15000});const before=await saved(page);await page.reload();await expandEditorPanels(page);await expect(page.locator('#recoveryPrompt')).toBeVisible();await page.locator('#restoreRecovery').click();await expect(page.locator('#meetingStatus')).toContainText('復旧データを読み込みました');expect(await saved(page)).toEqual(before);
+ await importPDF(page);await expect(page.locator('#recoveryStatus')).toContainText('保存済み',{timeout:15000});const before=await saved(page);await page.reload();await expect(page.locator('#startupChoices')).toBeVisible();await page.locator('#startupRestore').click();await expandEditorPanels(page);await expect(page.locator('#meetingStatus')).toContainText('前回のデータを復元しました');expect(await saved(page)).toEqual(before);
 });
 
 test('standalone file imports PDF without network and background replacement preserves notes',async({page})=>{
