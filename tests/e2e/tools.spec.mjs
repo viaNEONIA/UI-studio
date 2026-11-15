@@ -14,8 +14,8 @@ test('Material panel collapses while shapes stay available; shape fill and outli
 test('locked layers resist drag, text edit, deletion and group movement; unlock restores editing',async({page})=>{
  await page.locator('#addBox').click();await page.locator('#pLocked').check();await expect(page.locator('#pText')).toBeDisabled();const before=await saved(page),b=await page.locator('.element').boundingBox();
  await page.mouse.move(b.x+20,b.y+20);await page.mouse.down();await page.mouse.move(b.x+70,b.y+40);await page.mouse.up();await page.keyboard.press('Delete');expect(await saved(page)).toEqual(before);
- await page.locator('#components button').getByText('テキスト',{exact:true}).click();await page.locator('#layers .layer').nth(1).click({modifiers:['Control']});await page.locator('#alignLeft').click();expect((await saved(page)).screens[0].elements[0]).toEqual(before.screens[0].elements[0]);
- await page.locator('#layers .layer').nth(1).click();await page.locator('#pLocked').uncheck();await expect(page.locator('#pText')).toBeEnabled();await page.locator('#pText').fill('編集可');expect((await saved(page)).screens[0].elements[0].text).toBe('編集可');
+ await page.locator('#components button').getByText('テキスト',{exact:true}).click();await page.locator('#layers .layer').nth(1).click({modifiers:['Control'],force:true});await page.locator('#alignLeft').click();expect((await saved(page)).screens[0].elements[0]).toEqual(before.screens[0].elements[0]);
+ await page.locator('#layers .layer-lock').nth(1).click();await page.locator('#layers .layer').nth(1).click();await expect(page.locator('#pText')).toBeEnabled();await page.locator('#pText').fill('編集可');expect((await saved(page)).screens[0].elements[0].text).toBe('編集可');
 });
 test('stamp image can be placed repeatedly and saved with its palette',async({page})=>{
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
