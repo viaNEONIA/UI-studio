@@ -1,0 +1,29 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+import {expandEditorPanels} from './editor-panels.mjs';
+async function saved(page){const w=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await w).path(),'utf8'))}
+async function at(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());return{x:r.x+(x+2)*z,y:r.y+(y+2)*z}}
+async function click(page,x,y){const p=await at(page,x,y);await page.mouse.click(p.x,p.y)}
+async function move(page,x,y){const p=await at(page,x,y);await page.mouse.move(p.x,p.y)}
+async function zoomWheel(page){const before=Number(await page.locator('#zoom').inputValue());await page.keyboard.down('Control');await page.mouse.wheel(0,-100);await expect.poll(async()=>Number(await page.locator('#zoom').inputValue())).toBeGreaterThan(before);await page.keyboard.up('Control')}
+function world(e){return e.points.map(([x,y])=>[e.x+x*e.w,e.y+y*e.h])}
+function close(actual,expected){expect(actual[0]).toBeCloseTo(expected[0],3);expect(actual[1]).toBeCloseTo(expected[1],3)}
+test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});
+for(const [id,type]of [['drawLine','line'],['drawArrow','arrow'],['drawPolyline','polyline'],['drawCurve','curve'],['drawGuide','guide']])test(type+' keeps its tool and first point across Ctrl wheel zoom',async({page},info)=>{
+ await page.locator('#'+id).click();await click(page,90,130);await move(page,200,240);await zoomWheel(page);await expect(page.locator('#device')).toHaveClass(/drawing/);await expect(page.locator('.drawing-preview')).toHaveCount(1);const pts=await page.locator('.drawing-preview polyline').evaluate(n=>[...n.points].map(p=>[p.x,p.y]));close(pts[0],[90,130]);if(type==='line')await page.screenshot({path:info.outputPath('line-draft-after-wheel-zoom.png')});await click(page,260,320);if(['polyline','curve'].includes(type))await page.keyboard.press('Enter');const p=await saved(page);if(type==='guide'){const g=p.screens[0].guidelines[0];close([g.x,g.y],[90,130]);close([g.dx,g.dy],[170,190])}else{expect(p.screens[0].elements).toHaveLength(1);expect(p.screens[0].elements[0].type).toBe(type);const points=world(p.screens[0].elements[0]);close(points[0],[90,130]);close(points[1],[260,320])}
+});
+test('Ctrl wheel before placing the first point does not deselect the line tool',async({page})=>{
+ await page.locator('#quickLine').click();await move(page,160,220);await zoomWheel(page);await expect(page.locator('#device')).toHaveClass(/drawing/);await click(page,100,160);await click(page,240,300);const p=await saved(page);expect(p.screens[0].elements).toHaveLength(1);close(world(p.screens[0].elements[0])[0],[100,160]);
+});
+test('ordinary wheel scrolling preserves line draft and updates preview under a stationary pointer',async({page})=>{
+ await page.locator('#drawLine').click();await click(page,90,160);await move(page,180,240);const before=await page.locator('#workspace').evaluate(n=>n.scrollTop);await page.mouse.wheel(0,100);await expect.poll(()=>page.locator('#workspace').evaluate(n=>n.scrollTop)).toBeGreaterThan(before);await expect(page.locator('#device')).toHaveClass(/drawing/);const pts=await page.locator('.drawing-preview polyline').evaluate(n=>[...n.points].map(p=>[p.x,p.y]));close(pts[0],[90,160]);expect(pts[1][1]).toBeGreaterThan(240);await click(page,260,400);const p=await saved(page);close(world(p.screens[0].elements[0])[0],[90,160]);close(world(p.screens[0].elements[0])[1],[260,400]);
+});
+test('zoom selector, fit and responsive viewport changes preserve accumulated polyline points',async({page})=>{
+ await page.locator('#drawPolyline').click();await click(page,80,120);await click(page,180,220);await page.locator('#zoom').selectOption('1');await expect(page.locator('#device')).toHaveClass(/drawing/);await page.locator('#meetingFit').click();await page.setViewportSize({width:1320,height:1000});await expect(page.locator('#device')).toHaveClass(/drawing/);await expect(page.locator('.drawing-preview circle')).toHaveCount(2);await click(page,260,320);await page.keyboard.press('Enter');const pts=world((await saved(page)).screens[0].elements[0]);expect(pts).toHaveLength(3);for(let i=0;i<3;i++)close(pts[i],[[80,120],[180,220],[260,320]][i]);
+});
+test('cursor-position guide survives zoom and scroll and commits its current visible coordinate',async({page})=>{
+ await page.locator('#quickGuideV').click();await move(page,160,240);await zoomWheel(page);await expect(page.locator('#quickGuideV')).toHaveAttribute('aria-pressed','true');await expect(page.locator('.axis-guide-preview')).toHaveCount(1);const before=await page.locator('#workspace').evaluate(n=>n.scrollTop);await page.mouse.wheel(0,60);await expect.poll(()=>page.locator('#workspace').evaluate(n=>n.scrollTop)).toBeGreaterThan(before);await expect(page.locator('.axis-guide-preview')).toHaveCount(1);const x=Number(await page.locator('.axis-guide-preview').getAttribute('x1'));await page.keyboard.press('Enter');const p=await saved(page);expect(p.screens[0].guidelines).toHaveLength(1);expect(p.screens[0].guidelines[0].x).toBeCloseTo(x,3);
+});
+test('explicit Escape, selection tool and page change still cancel a draft after viewport changes',async({page})=>{
+ for(const action of ['escape','select','page']){await page.locator('#quickLine').click();await click(page,90,130);await move(page,200,240);await zoomWheel(page);if(action==='escape')await page.keyboard.press('Escape');else if(action==='select')await page.locator('#quickSelect').click();else{await page.locator('#pagePanel summary').evaluate(n=>n.parentElement.open=true);await page.locator('#newScreen').click()}await expect(page.locator('#device')).not.toHaveClass(/drawing/);await expect(page.locator('.drawing-preview')).toHaveCount(0);expect((await saved(page)).screens.every(s=>!s.elements.length)).toBe(true)}
+});
