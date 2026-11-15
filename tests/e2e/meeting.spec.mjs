@@ -1,3 +1,4 @@
+import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {jsPDF} from 'jspdf';
 import JSZip from 'jszip';
@@ -6,7 +7,7 @@ function samplePDF(){const pdf=new jsPDF({unit:'mm',format:'a4'});pdf.setFillCol
 async function download(page,id){const pending=page.waitForEvent('download');await page.locator(id).click();return readFile(await(await pending).path())}
 async function saved(page){return JSON.parse((await download(page,'#saveJson')).toString())}
 async function importPDF(page){await page.locator('#documentFile').setInputFiles({name:'dummy.pdf',mimeType:'application/pdf',buffer:samplePDF()});await expect(page.locator('#meetingStatus')).toContainText('2ページを取り込みました',{timeout:60000})}
-test.beforeEach(async({page})=>{await page.goto('/')});
+test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});
 test('PDF pages become locked bottom backgrounds; edits and full JSON/HTML round trip',async({page})=>{
  await page.locator('#preset').selectOption('794,1123');await importPDF(page);
  const p=await saved(page);expect(p.screens).toHaveLength(2);expect(p.screens[0].background.locked).toBe(true);expect(p.screens[0].background.src).toMatch(/^data:image\/png;base64,/);
@@ -35,11 +36,11 @@ test('invalid PDF import is atomic and meeting controls navigate and preserve ed
  await importPDF(page);await page.locator('#meetingMode').click();await expect(page.locator('aside.left')).toBeHidden();await page.locator('#nextPage').click();await expect(page.locator('#pageCount')).toHaveText('2 / 2');await page.locator('#previousPage').click();await expect(page.locator('#pageCount')).toHaveText('1 / 2');await page.locator('#meetingMode').click();await expect(page.locator('aside.left')).toBeVisible();
 });
 test('local recovery preserves embedded backgrounds across reload',async({page})=>{
- await importPDF(page);await expect(page.locator('#recoveryStatus')).toContainText('保存済み',{timeout:15000});const before=await saved(page);await page.reload();await expect(page.locator('#recoveryPrompt')).toBeVisible();await page.locator('#restoreRecovery').click();await expect(page.locator('#meetingStatus')).toContainText('復旧データを読み込みました');expect(await saved(page)).toEqual(before);
+ await importPDF(page);await expect(page.locator('#recoveryStatus')).toContainText('保存済み',{timeout:15000});const before=await saved(page);await page.reload();await expandEditorPanels(page);await expect(page.locator('#recoveryPrompt')).toBeVisible();await page.locator('#restoreRecovery').click();await expect(page.locator('#meetingStatus')).toContainText('復旧データを読み込みました');expect(await saved(page)).toEqual(before);
 });
 
 test('standalone file imports PDF without network and background replacement preserves notes',async({page})=>{
- const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
+ const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);
  const outbound=[];page.on('request',r=>{if(/^https?:/.test(r.url()))outbound.push(r.url())});await importPDF(page);
  await page.locator('#components button').getByText('テキスト',{exact:true}).click();await page.locator('#pText').fill('残す注記');
  const before=await saved(page),single=new jsPDF();single.text('Replacement',20,30);await page.locator('#replaceFile').setInputFiles({name:'replacement.pdf',mimeType:'application/pdf',buffer:Buffer.from(single.output('arraybuffer'))});await expect(page.locator('#meetingStatus')).toContainText('取り込みました');
