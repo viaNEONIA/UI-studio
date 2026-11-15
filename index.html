@@ -323,13 +323,13 @@ $('importPropertyPresets').onclick=()=>{if(!viewOnly)$('propertyPresetsFile').cl
 $('propertyPresetsFile').onchange=async ev=>{const file=ev.target.files[0];ev.target.value='';if(!file||viewOnly)return;try{if(file.size>1024*1024)throw Error('設定ファイルは1MB以内です');const data=validatePropertySettings(JSON.parse(await file.text()));propertySettings=data;selectedPropertyPreset='';const ok=persistProperties();renderPropertyPresets();if(ok)propertyFeedback('設定ファイルを読み込み、保存設定一覧を置き換えました')}catch(error){propertyFeedback('読込失敗: '+error.message)}};
 try{const raw=localStorage.getItem(propertyStorageKey);if(raw)propertySettings=validatePropertySettings(JSON.parse(raw))}catch(error){propertyStorageError='保存設定を読み込めませんでした: '+error.message}
 function fitCanvasToViewport(){
- const workspace=$('workspace');fitView=true;ensurePanSpace();
+ const workspace=$('workspace');if(!workspace)return;fitView=true;ensurePanSpace();
  // Fit against the actual content viewport after both scrollbars are present.
  const z=Math.min(1,Math.max(.001,(workspace.clientWidth-96)/project.width),Math.max(.001,(workspace.clientHeight-96)/project.height));
  let option=$('zoom').querySelector('[data-fit]');if(!option){option=document.createElement('option');option.dataset.fit='true';$('zoom').append(option)}option.value=String(z);option.textContent=(z*100).toFixed(z<.01?2:0)+'%（全体）';$('zoom').value=String(z);render();
  const rect=$('device').getBoundingClientRect(),host=workspace.getBoundingClientRect();workspace.scrollLeft+=rect.left+rect.width/2-(host.left+workspace.clientLeft+workspace.clientWidth/2);workspace.scrollTop+=rect.top+rect.height/2-(host.top+workspace.clientTop+workspace.clientHeight/2);
 }
-let fitFrame;new ResizeObserver(()=>{if(!fitView)return;cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(()=>{if(fitView)fitCanvasToViewport()})}).observe($('workspace'));
+let fitFrame;new ResizeObserver(()=>{if(!fitView||!$('workspace'))return;cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(()=>{if(fitView&&$('workspace'))fitCanvasToViewport()})}).observe($('workspace'));
 
 let textEditTarget=null,textComposing=false;
 function canEditText(e){return !isLine(e)&&!['image','divider','progress','slider'].includes(e.type)}
