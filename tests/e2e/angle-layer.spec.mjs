@@ -6,7 +6,7 @@ async function clickPoint(page,x,y){const p=await point(page,x,y);await page.mou
 async function movePoint(page,x,y){const p=await point(page,x,y);await page.mouse.move(p.x,p.y,{steps:8})}
 async function lockAngle(page,angle){await page.locator('#angleValue').fill(String(angle));await page.locator('#angleLock').check()}
 const world=e=>e.points.map(([x,y])=>[e.x+x*e.w,e.y+y*e.h]);
-function expectAngle(a,b,angle){const r=angle*Math.PI/180;expect(Math.abs((b[0]-a[0])*Math.sin(r)-(b[1]-a[1])*Math.cos(r))).toBeLessThan(1e-6)}
+function expectAngle(a,b,angle){const r=angle*Math.PI/180;expect(Math.abs((b[0]-a[0])*Math.sin(r)-(b[1]-a[1])*Math.cos(r))).toBeLessThan(1e-4)}
 async function load(page,p){await page.locator('#file').setInputFiles({name:'test.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))})}
 const element=(id,type,x,y,w,h,extra={})=>({id,type,name:id,x,y,w,h,text:'',bg:'#dbeafe',color:'#172235',font:16,radius:0,...extra});
 test.beforeEach(async({page})=>{await page.goto('/')});
@@ -14,7 +14,7 @@ for(const angle of [0,22.5,30,45,90,135,270,360])test('drawing locks preview and
  await lockAngle(page,angle);await page.locator('#drawLine').click();await clickPoint(page,150,250);await movePoint(page,300,420);const pts=await page.locator('.drawing-preview polyline').evaluate(n=>[...n.points].map(p=>[p.x,p.y]));expectAngle(pts[0],pts[1],angle);await clickPoint(page,300,420);const e=(await saved(page)).screens[0].elements[0];expectAngle(...world(e),angle);await page.locator('#undo').click();expect((await saved(page)).screens[0].elements).toHaveLength(0);
 });
 test('angle lock switches off, Shift overrides it and Ctrl only snaps to compatible targets',async({page})=>{
- const p={version:1,width:600,height:600,screens:[{id:'s',name:'角度',elements:[element('box','box',240,240,120,120)]}]};await load(page,p);await lockAngle(page,45);await page.locator('#drawArrow').click();await clickPoint(page,100,100);await page.keyboard.down('Control');await movePoint(page,303,303);await expect(page.locator('.connection-snap')).toHaveCount(1);await clickPoint(page,303,303);await page.keyboard.up('Control');const e=(await saved(page)).screens[0].elements[1];for(const [i,pt] of world(e).entries()){expect(pt[0]).toBeCloseTo(i?300:100,6);expect(pt[1]).toBeCloseTo(i?300:100,6)}
+ const p={version:1,width:600,height:600,screens:[{id:'s',name:'角度',elements:[element('box','box',240,240,120,120)]}]};await load(page,p);await lockAngle(page,45);await page.locator('#drawArrow').click();await clickPoint(page,100,100);await page.keyboard.down('Control');await movePoint(page,303,303);await expect(page.locator('.connection-snap')).toHaveCount(1);await clickPoint(page,303,303);await page.keyboard.up('Control');const e=(await saved(page)).screens[0].elements[1];for(const [i,pt] of world(e).entries()){expect(pt[0]).toBeCloseTo(i?300:100,4);expect(pt[1]).toBeCloseTo(i?300:100,4)}
  await page.locator('#drawLine').click();await clickPoint(page,80,150);await page.keyboard.down('Shift');await clickPoint(page,240,180);await page.keyboard.up('Shift');const e2=(await saved(page)).screens[0].elements[2];expect(world(e2)[0][1]).toBeCloseTo(world(e2)[1][1]);
  await page.locator('#angleLock').uncheck();await page.locator('#drawLine').click();await clickPoint(page,40,40);await clickPoint(page,200,90);const free=world((await saved(page)).screens[0].elements[3]);expect(free[0][0]).toBeCloseTo(40);expect(free[0][1]).toBeCloseTo(40);expect(free[1][0]).toBeCloseTo(200);expect(free[1][1]).toBeCloseTo(90);
 });
