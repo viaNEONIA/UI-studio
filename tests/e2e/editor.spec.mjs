@@ -121,7 +121,7 @@ test('draw polyline and curve, adjust stroke palette and export SVG',async({page
 });
 test('straight line and arrow finish at two points, undo and cancellation',async({page})=>{
  const r=await page.locator('#device').boundingBox();for(const [id,y]of [['drawLine',80],['drawArrow',200]]){await page.locator('#'+id).click();await page.mouse.click(r.x+30,r.y+y);await page.mouse.click(r.x+180,r.y+y+30)}
- await expect(page.locator('.element')).toHaveCount(2);await expect(page.locator('.element').last().locator('path')).toHaveCount(2);
+ await expect(page.locator('.element')).toHaveCount(2);await expect(page.locator('.element').last().locator('svg g path')).toHaveCount(2);
  await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(1);await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(2);
  await page.locator('#drawPolyline').click();await page.mouse.click(r.x+30,r.y+300);await page.locator('#cancelDrawing').click();await expect(page.locator('.drawing-preview')).toHaveCount(0);await expect(page.locator('.element')).toHaveCount(2);
 });
