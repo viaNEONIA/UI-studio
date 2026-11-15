@@ -11,8 +11,8 @@ function expectAngle(a,b,angle){const r=angle*Math.PI/180;expect(Math.abs((b[0]-
 async function load(page,p){await page.locator('#file').setInputFiles({name:'test.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))})}
 const element=(id,type,x,y,w,h,extra={})=>({id,type,name:id,x,y,w,h,text:'',bg:'#dbeafe',color:'#172235',font:16,radius:0,...extra});
 test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});
-for(const angle of [0,22.5,30,45,90,135,270,360])test('drawing locks preview and endpoint at '+angle+' degrees',async({page})=>{
- await lockAngle(page,angle);await page.locator('#drawLine').click();await clickPoint(page,150,250);await movePoint(page,300,420);const pts=await page.locator('.drawing-preview polyline').evaluate(n=>[...n.points].map(p=>[p.x,p.y]));expectAngle(pts[0],pts[1],angle);await clickPoint(page,300,420);const e=(await saved(page)).screens[0].elements[0];expectAngle(...world(e),angle);await page.locator('#undo').click();expect((await saved(page)).screens[0].elements).toHaveLength(0);
+for(const [step,angle] of [[15,45],[22.5,45],[30,60],[45,45],[60,60],[90,90],[135,0],[360,0]])test('drawing snaps preview and endpoint to '+step+' degree increments',async({page})=>{
+ await lockAngle(page,step);await page.locator('#drawLine').click();await clickPoint(page,150,250);await movePoint(page,300,420);const pts=await page.locator('.drawing-preview polyline').evaluate(n=>[...n.points].map(p=>[p.x,p.y]));expectAngle(pts[0],pts[1],angle);await clickPoint(page,300,420);const e=(await saved(page)).screens[0].elements[0];expectAngle(...world(e),angle);await page.locator('#undo').click();expect((await saved(page)).screens[0].elements).toHaveLength(0);
 });
 test('angle lock switches off, Shift overrides it and Ctrl only snaps to compatible targets',async({page})=>{
  const p={version:1,width:600,height:600,screens:[{id:'s',name:'角度',elements:[element('box','box',240,240,120,120)]}]};await load(page,p);await lockAngle(page,45);await page.locator('#drawArrow').click();await clickPoint(page,100,100);await page.keyboard.down('Control');await movePoint(page,303,303);await expect(page.locator('.connection-snap')).toHaveCount(1);await clickPoint(page,303,303);await page.keyboard.up('Control');const e=(await saved(page)).screens[0].elements[1];for(const [i,pt] of world(e).entries()){expect(pt[0]).toBeCloseTo(i?300:100,4);expect(pt[1]).toBeCloseTo(i?300:100,4)}
@@ -20,7 +20,7 @@ test('angle lock switches off, Shift overrides it and Ctrl only snaps to compati
  await page.locator('#angleLock').uncheck();await page.locator('#drawLine').click();await clickPoint(page,40,40);await clickPoint(page,200,90);const free=world((await saved(page)).screens[0].elements[3]);expect(free[0][0]).toBeCloseTo(40);expect(free[0][1]).toBeCloseTo(40);expect(free[1][0]).toBeCloseTo(200);expect(free[1][1]).toBeCloseTo(90);
 });
 test('polyline segments, guide creation and control-point drag maintain the chosen angle',async({page})=>{
- await lockAngle(page,30);await page.locator('#drawPolyline').click();await clickPoint(page,40,50);await clickPoint(page,160,140);await clickPoint(page,300,220);await page.keyboard.press('Enter');let p=await saved(page),pts=world(p.screens[0].elements[0]);expectAngle(pts[0],pts[1],30);expectAngle(pts[1],pts[2],30);const h=await page.locator('.vertex').last().boundingBox();await page.mouse.move(h.x+h.width/2,h.y+h.height/2);await page.mouse.down();await movePoint(page,340,300);await page.mouse.up();pts=world((await saved(page)).screens[0].elements[0]);expectAngle(pts[1],pts[2],30);
+ await lockAngle(page,30);await page.locator('#drawPolyline').click();await clickPoint(page,40,50);await clickPoint(page,160,140);await clickPoint(page,300,220);await page.keyboard.press('Enter');let p=await saved(page),pts=world(p.screens[0].elements[0]);expectAngle(pts[0],pts[1],30);expectAngle(pts[1],pts[2],30);const h=await page.locator('.vertex').last().boundingBox();await page.mouse.move(h.x+h.width/2,h.y+h.height/2);await page.mouse.down();await movePoint(page,340,300);await page.mouse.up();pts=world((await saved(page)).screens[0].elements[0]);expectAngle(pts[1],pts[2],60);
  await page.locator('#drawGuide').click();await clickPoint(page,20,300);await clickPoint(page,300,500);const g=(await saved(page)).screens[0].guidelines[0];expectAngle([g.x,g.y],[g.x+g.dx,g.y+g.dy],30);
 });
 test('locked objects cannot be selected by canvas, layer list, modifiers or group, and unlock restores selection',async({page})=>{
@@ -35,5 +35,5 @@ test('unbuilt HTML supports angle lock and lock-only selection policy',async({pa
 });
 
 test('invalid locked angle does not create an unconstrained line',async({page})=>{
- await lockAngle(page,361);await page.locator('#drawLine').click();await clickPoint(page,40,40);await clickPoint(page,200,150);expect((await saved(page)).screens[0].elements).toHaveLength(0);await expect(page.locator('#meetingStatus')).toContainText('0〜360');
+ await lockAngle(page,361);await page.locator('#drawLine').click();await clickPoint(page,40,40);await clickPoint(page,200,150);expect((await saved(page)).screens[0].elements).toHaveLength(0);await expect(page.locator('#meetingStatus')).toContainText('0.1〜360');
 });
