@@ -1,8 +1,9 @@
+import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 async function saved(page){const promise=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await promise).path(),'utf8'))}
 async function setInput(page,id,value){await page.locator(id).evaluate((n,v)=>{n.value=v;n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}))},String(value))}
-test.beforeEach(async({page})=>{await page.goto('/')});
+test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});
 test('Material panel collapses while shapes stay available; shape fill and outline round trip',async({page})=>{
  await page.locator('#materialTools summary').click();await expect(page.locator('#components')).toBeHidden();
  await page.locator('#addCircle').click();await setInput(page,'#pBg','#ff0000');await setInput(page,'#pBgTransparency',40);await setInput(page,'#pOutlineColor','#0000ff');await setInput(page,'#pOutlineWidth',6);await setInput(page,'#pOutlineTransparency',75);
@@ -14,7 +15,7 @@ test('Material panel collapses while shapes stay available; shape fill and outli
 test('locked layers resist drag, text edit, deletion and group movement; unlock restores editing',async({page})=>{
  await page.locator('#addBox').click();await page.locator('#pLocked').check();await expect(page.locator('#pText')).toBeDisabled();const before=await saved(page),b=await page.locator('.element').boundingBox();
  await page.mouse.move(b.x+20,b.y+20);await page.mouse.down();await page.mouse.move(b.x+70,b.y+40);await page.mouse.up();await page.keyboard.press('Delete');expect(await saved(page)).toEqual(before);
- await page.locator('#components button').getByText('テキスト',{exact:true}).click();await page.locator('#layers .layer').nth(1).click({modifiers:['Control'],force:true});await page.locator('#alignLeft').click();expect((await saved(page)).screens[0].elements[0]).toEqual(before.screens[0].elements[0]);
+ await page.locator('#components button').getByText('テキスト',{exact:true}).click();await page.locator('#layers .layer').nth(1).click({modifiers:['Control'],force:true});await page.locator('#layers .layer').first().click();await page.locator('#alignLeft').click();expect((await saved(page)).screens[0].elements[0]).toEqual(before.screens[0].elements[0]);
  await page.locator('#layers .layer-lock').nth(1).click();await page.locator('#layers .layer').nth(1).click();await expect(page.locator('#pText')).toBeEnabled();await page.locator('#pText').fill('編集可');expect((await saved(page)).screens[0].elements[0].text).toBe('編集可');
 });
 test('stamp image can be placed repeatedly and saved with its palette',async({page})=>{
@@ -55,13 +56,13 @@ test('hand, middle and arrow pan move a fully fitted canvas without changing dat
  await page.locator('#viewMode').click();await page.keyboard.press('ArrowRight');const viewed=await page.locator('#device').boundingBox();expect(Math.abs(viewed.x-afterArrow.x+60)).toBeLessThan(2);
 });
 test('repository root HTML initializes all basic toolbar handlers without a build',async({page})=>{
- const {pathToFileURL}=await import('node:url');const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(process.cwd()+'/index.html').href);
+ const {pathToFileURL}=await import('node:url');const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(process.cwd()+'/index.html').href);await expandEditorPanels(page);
  await page.locator('#handTool').click();await expect(page.locator('#handTool')).toHaveAttribute('aria-pressed','true');const initialZoom=Number(await page.locator('#zoom').inputValue());await page.locator('#meetingZoomIn').click();expect(Number(await page.locator('#zoom').inputValue())).toBeGreaterThan(initialZoom);await page.locator('#meetingZoomOut').click();await page.locator('#meetingFit').click();
  await page.locator('#viewMode').click();await expect(page.locator('#viewMode')).toHaveAttribute('aria-pressed','true');await page.locator('#viewMode').click();await expect(page.locator('#viewMode')).toHaveAttribute('aria-pressed','false');await page.locator('#laserTool').click();await expect(page.locator('.laser-dot')).toBeVisible();await page.keyboard.press('Escape');
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');const chooserPromise=page.waitForEvent('filechooser');await page.locator('#importDocument').click();const chooser=await chooserPromise;await chooser.setFiles({name:'image.png',mimeType:'image/png',buffer:png});await expect(page.locator('#device > .document-background')).toHaveCount(1);await expect(page.locator('#meetingStatus')).toContainText('取り込みました');
  await page.locator('#meetingMode').click();await expect(page.locator('aside.left')).toBeHidden();await page.locator('#meetingMode').click();await expect(page.locator('aside.left')).toBeVisible();expect(errors).toEqual([]);
 });
 test('unbuilt root HTML explains unavailable PDF features and keeps controls responsive',async({page})=>{
- const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/index.html').href);await expect(page.locator('#exportPdf')).toBeDisabled();await expect(page.locator('#exportPptx')).toBeDisabled();const before=await saved(page);
+ const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/index.html').href);await expandEditorPanels(page);await expect(page.locator('#exportPdf')).toBeDisabled();await expect(page.locator('#exportPptx')).toBeDisabled();const before=await saved(page);
  await page.locator('#documentFile').setInputFiles({name:'test.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4')});await expect(page.locator('#meetingStatus')).toContainText('PDF取込にはビルド済み');expect(await saved(page)).toEqual(before);await page.locator('#handTool').click();await expect(page.locator('#handTool')).toHaveAttribute('aria-pressed','true');
 });

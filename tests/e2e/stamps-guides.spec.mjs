@@ -1,3 +1,4 @@
+import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
@@ -6,7 +7,7 @@ async function saved(page){const wait=page.waitForEvent('download');await page.l
 async function load(page,p){await page.locator('#file').setInputFiles({name:'project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))})}
 async function guide(page,axis,pos){await page.locator('#guideAxis').selectOption(axis);await page.locator('#guidePosition').fill(String(pos));await page.locator('#addGuide').click()}
 async function drag(page,locator,dx,dy,modifiers=[]){const b=await locator.boundingBox();for(const m of modifiers)await page.keyboard.down(m);await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+dx,b.y+b.height/2+dy,{steps:8});await page.mouse.up();for(const m of modifiers)await page.keyboard.up(m)}
-test.beforeEach(async({page})=>{await page.goto('/')});
+test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});
 test('batch stamps register, multi-place in one undo and remove registry without removing placed images',async({page})=>{
  await page.locator('#stampFile').setInputFiles([image('a.png'),image('b.png'),image('c.png')]);await expect(page.locator('.stamp-card')).toHaveCount(3);
  await page.getByLabel('スタンプを選択: a.png',{exact:true}).check();await page.getByLabel('スタンプを選択: b.png',{exact:true}).check();await page.locator('#placeStamps').click();let p=await saved(page);expect(p.screens[0].elements).toHaveLength(2);expect(p.screens[0].elements.map(e=>e.name)).toEqual(['a.png','b.png']);
@@ -45,7 +46,7 @@ test('viewing blocks guide, stamp and background edits; invalid guide JSON keeps
  const bad=structuredClone(before);bad.screens[0].guidelines=[{id:'bad',x:0,y:0,dx:0,dy:0}];page.once('dialog',d=>d.accept());await load(page,bad);expect(await saved(page)).toEqual(before);
 });
 test('new controls also work in unbuilt local HTML and legacy lines without points remain editable',async({page},testInfo)=>{
- const {pathToFileURL}=await import('node:url');const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(process.cwd()+'/index.html').href);
+ const {pathToFileURL}=await import('node:url');const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(pathToFileURL(process.cwd()+'/index.html').href);await expandEditorPanels(page);
  await page.locator('#components button').getByText('直線',{exact:true}).click();const p=await saved(page);delete p.screens[0].elements[0].points;await load(page,p);await page.locator('#layers .layer').click();await page.locator('#addControlPoint').click();await expect(page.locator('.vertex')).toHaveCount(3);await guide(page,'h',320);await guide(page,'v',210);await page.locator('#stampFile').setInputFiles([image('記号A.png'),image('記号B.png')]);await expect(page.locator('.stamp-card')).toHaveCount(2);await page.getByLabel('スタンプを選択: 記号A.png',{exact:true}).check();await page.getByLabel('スタンプを選択: 記号B.png',{exact:true}).check();await page.locator('#placeStamps').click();expect((await saved(page)).screens[0].elements).toHaveLength(3);expect(errors).toEqual([]);
  await page.locator('#materialTools summary').click();await page.locator('#screenSettings summary').click();await page.screenshot({path:testInfo.outputPath('stamp-guide-controls.png')});
 });

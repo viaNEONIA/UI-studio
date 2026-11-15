@@ -1,3 +1,4 @@
+import {expandEditorPanels} from './editor-panels.mjs';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 const element = (id, x=20) => ({ id, type:'button', name:'ダミー', x, y:40, w:100, h:48, text:'テスト', bg:'#2563eb', color:'#ffffff', font:16, radius:9, css:'', link:'' });
@@ -6,7 +7,7 @@ async function load(page, data) { await page.locator('#file').setInputFiles({nam
 async function download(page, id) { const pending=page.waitForEvent('download'); await page.locator(id).click(); return readFile(await (await pending).path(), 'utf8'); }
 async function saved(page) {return JSON.parse(await download(page,'#saveJson'));}
 async function move(page, locator, dx, dy) {const r=await locator.boundingBox();await page.mouse.move(r.x+5,r.y+5);await page.mouse.down();await page.mouse.move(r.x+5+dx*.65,r.y+5+dy*.65,{steps:5});await page.mouse.up();}
-test.beforeEach(async ({page}, testInfo) => {if(process.env.BASELINE && /group at edge|invalid import|export escapes/.test(testInfo.title))test.fail(true,'Original v0.6 regression reproduction');await page.goto('/');});
+test.beforeEach(async ({page}, testInfo) => {if(process.env.BASELINE && /group at edge|invalid import|export escapes/.test(testInfo.title))test.fail(true,'Original v0.6 regression reproduction');await page.goto('/');await expandEditorPanels(page);});
 test('all components add; undo, redo, delete',async({page})=>{
   const buttons=page.locator('#components button'),count=await buttons.count();for(let i=0;i<await buttons.count();i++)await buttons.nth(i).click();
   await expect(page.locator('.element')).toHaveCount(count);
@@ -92,7 +93,7 @@ test('screen add rename switch and last-screen deletion guard',async({page})=>{
  let message='';page.once('dialog',async dialog=>{message=dialog.message();await dialog.accept()});await page.locator('#screens').getByTitle('画面を削除').click();expect(message).toContain('最後の画面');expect((await saved(page)).screens).toHaveLength(1);
 });
 test('local file launch supports import edit and JSON download',async({page})=>{
- const { pathToFileURL }=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
+ const { pathToFileURL }=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);
  await load(page,project());await page.locator('#layers button.layer').click();await page.locator('#pText').fill('ローカル動作確認');expect((await saved(page)).screens[0].elements[0].text).toBe('ローカル動作確認');
 });
 for(const [label,w,h] of [['A4 縦',794,1123],['A4 横',1123,794],['A3 縦',1123,1587],['A3 横',1587,1123]]){
