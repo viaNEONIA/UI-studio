@@ -12,7 +12,7 @@ test('all components add; undo, redo, delete',async({page})=>{
   await expect(page.locator('.element')).toHaveCount(count);
   await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(count-1);
   await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(count);
-  await page.locator('#layers button').first().click();await page.keyboard.press('Delete');await expect(page.locator('.element')).toHaveCount(count-1);
+  await page.locator('#layers button.layer').first().click();await page.keyboard.press('Delete');await expect(page.locator('.element')).toHaveCount(count-1);
 });
 test('drag and resize use canvas coordinates',async({page})=>{
   await load(page,project());await page.locator('#snapOn').uncheck();
@@ -23,7 +23,7 @@ test('drag and resize use canvas coordinates',async({page})=>{
 });
 test('group at edge preserves relative positions; ungroup and alignment',async({page})=>{
   await load(page,project([element('a',20),element('b',150)]));await page.locator('#snapOn').uncheck();
-  await page.locator('#layers button').nth(0).click();await page.locator('#layers button').nth(1).click({modifiers:['Control']});await page.locator('#group').click();
+  await page.locator('#layers button.layer').nth(0).click();await page.locator('#layers button.layer').nth(1).click({modifiers:['Control']});await page.locator('#group').click();
   await move(page,page.locator('[data-id="a"]'),-100,0);
   const es=(await saved(page)).screens[0].elements;expect(es[1].x-es[0].x).toBe(130);expect(es[0].x).toBe(0);
   await page.locator('#ungroup').click();expect((await saved(page)).screens[0].elements.every(e=>!e.group)).toBe(true);
@@ -31,7 +31,7 @@ test('group at edge preserves relative positions; ungroup and alignment',async({
 });
 test('legacy JSON without anchors round trips including extension metadata',async({page})=>{
  const p=project();p.extension={dummy:true};await load(page,p);expect(await saved(page)).toEqual(p);
- await page.locator('#layers button').click();await page.locator('#pAnchorX').selectOption('right');await page.locator('#pAnchorY').selectOption('bottom');
+ await page.locator('#layers button.layer').click();await page.locator('#pAnchorX').selectOption('right');await page.locator('#pAnchorY').selectOption('bottom');
  await page.locator('#preset').selectOption('768,1024');let e=(await saved(page)).screens[0].elements[0];expect([e.x,e.y]).toEqual([376,149]);
  await page.locator('#undo').click();expect((await saved(page)).width).toBe(412);
 });
@@ -41,7 +41,7 @@ test('invalid import leaves current project intact',async({page})=>{
 });
 test('screen editing, copy/paste, order and links in exported HTML',async({page})=>{
  await load(page,project());await page.locator('#duplicateScreen').click();await expect(page.locator('#screens .screenrow')).toHaveCount(2);
- await page.locator('#layers button').click();await page.keyboard.press('Control+c');await page.keyboard.press('Control+v');await expect(page.locator('.element')).toHaveCount(2);
+ await page.locator('#layers button.layer').click();await page.keyboard.press('Control+c');await page.keyboard.press('Control+v');await expect(page.locator('.element')).toHaveCount(2);
  await page.locator('#layerDown').click();await page.locator('#pLink').selectOption('s1');
  const html=await download(page,'#exportHtml');await page.setContent(html);await page.locator('nav button').nth(1).click();await expect(page.locator('.screen.visible')).toHaveCount(1);await page.locator('.screen.visible .item[data-link]').click({position:{x:95,y:30}});await expect(page.locator('#s1')).toHaveClass('screen visible');
 });
@@ -51,7 +51,7 @@ test('export escapes arbitrary screen IDs and sandboxes HTML',async({page})=>{
 });
 test('grid, zoom, overflow audit, stretch constraints and screenshot',async({page},testInfo)=>{
  await load(page,project());await page.locator('#gridOn').check();await expect(page.locator('#device')).toHaveCSS('background-size','8px 8px');
- await page.locator('#layers button').click();await page.locator('#pAnchorX').selectOption('stretch');await page.locator('#pAnchorY').selectOption('center');await page.locator('#preset').selectOption('768,1024');
+ await page.locator('#layers button.layer').click();await page.locator('#pAnchorX').selectOption('stretch');await page.locator('#pAnchorY').selectOption('center');await page.locator('#preset').selectOption('768,1024');
  const e=(await saved(page)).screens[0].elements[0];expect([e.w,e.y]).toEqual([456,95]);
  await page.locator('#pX').fill('-10');await expect(page.locator('#layoutAudit')).toContainText('画面外の部品 1 件');await page.locator('#fitZoom').click();
  await page.screenshot({path:testInfo.outputPath('editor.png'),fullPage:true});
@@ -70,7 +70,7 @@ test('fit includes large canvas below 50 percent',async({page})=>{
 });
 test('ungrouped multiple selection drags together and undoes once',async({page})=>{
  await load(page,project([element('a',20),element('b',150)]));await page.locator('#snapOn').uncheck();
- await page.locator('#layers button').nth(0).click();await page.locator('#layers button').nth(1).click({modifiers:['Control']});
+ await page.locator('#layers button.layer').nth(0).click();await page.locator('#layers button.layer').nth(1).click({modifiers:['Control']});
  await move(page,page.locator('[data-id="a"]'),30,25);expect((await saved(page)).screens[0].elements.map(e=>[e.x,e.y])).toEqual([[50,65],[180,65]]);
  await page.locator('#undo').click();expect((await saved(page)).screens[0].elements.map(e=>[e.x,e.y])).toEqual([[20,40],[150,40]]);
 });
@@ -93,7 +93,7 @@ test('screen add rename switch and last-screen deletion guard',async({page})=>{
 });
 test('local file launch supports import edit and JSON download',async({page})=>{
  const { pathToFileURL }=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
- await load(page,project());await page.locator('#layers button').click();await page.locator('#pText').fill('ローカル動作確認');expect((await saved(page)).screens[0].elements[0].text).toBe('ローカル動作確認');
+ await load(page,project());await page.locator('#layers button.layer').click();await page.locator('#pText').fill('ローカル動作確認');expect((await saved(page)).screens[0].elements[0].text).toBe('ローカル動作確認');
 });
 for(const [label,w,h] of [['A4 縦',794,1123],['A4 横',1123,794],['A3 縦',1123,1587],['A3 横',1587,1123]]){
  test(`${label} canvas fits, round trips and exports correct dimensions`,async({page})=>{
@@ -128,7 +128,7 @@ for(const type of ['line','arrow','polyline','curve']){
  test(`${type} vertex drag preserves other points, undo and JSON/export`,async({page})=>{
   const points=['line','arrow'].includes(type)?[[0,0],[1,1]]:[[0,0],[.5,1],[1,0]];
   const p=project([{...element('v',80),type,y:100,w:160,h:100,points,stroke:'#2563eb',strokeWidth:5}]);
-  await load(page,p);await page.locator('#layers button').click();await expect(page.locator('.vertex')).toHaveCount(points.length);
+  await load(page,p);await page.locator('#layers button.layer').click();await expect(page.locator('.vertex')).toHaveCount(points.length);
   const world=e=>e.points.map(([x,y])=>[e.x+x*e.w,e.y+y*e.h]);const before=world(p.screens[0].elements[0]);
   const handle=page.locator('.vertex').first(),r=await handle.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2-26,r.y+r.height/2+13,{steps:4});await page.mouse.up();
   const after=await saved(page),positions=world(after.screens[0].elements[0]);expect(positions[0][0]).toBeCloseTo(before[0][0]-40);expect(positions[0][1]).toBeCloseTo(before[0][1]+20);expect(positions.slice(1)).toEqual(before.slice(1));
@@ -137,19 +137,19 @@ for(const type of ['line','arrow','polyline','curve']){
  });
 }
 test('background transparency preserves text, color, history and exports',async({page})=>{
- await load(page,project([{...element('a'),type:'text',bg:'#2563eb'}]));await page.locator('#layers button').click();
+ await load(page,project([{...element('a'),type:'text',bg:'#2563eb'}]));await page.locator('#layers button.layer').click();
  await expect(page.locator('#pBgTransparency')).toHaveValue('0');await setTransparency(page,60);
  await expect(page.locator('.element')).toHaveCSS('background-color','rgba(37, 99, 235, 0.4)');
  await expect(page.locator('.element')).toHaveCSS('color','rgb(255, 255, 255)');await expect(page.locator('.element')).toHaveCSS('opacity','1');
  await page.locator('#pBgTransparent').check();await expect(page.locator('.element')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
  await page.locator('#pBgTransparent').uncheck();await expect(page.locator('#pBgTransparency')).toHaveValue('60');
- const data=await saved(page);await load(page,data);await page.locator('#layers button').click();await expect(page.locator('#pBgTransparency')).toHaveValue('60');
+ const data=await saved(page);await load(page,data);await page.locator('#layers button.layer').click();await expect(page.locator('#pBgTransparency')).toHaveValue('60');
  await setTransparency(page,100);await expect(page.locator('.element')).toHaveCSS('background-color','rgba(37, 99, 235, 0)');
  await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCSS('background-color','rgba(37, 99, 235, 0.4)');
  const html=await download(page,'#exportHtml');await page.setContent(html);await expect(page.locator('.item')).toHaveCSS('background-color','rgba(37, 99, 235, 0.4)');
 });
 test('legacy transparent backgrounds remain transparent and can be recolored',async({page})=>{
- await load(page,project([{...element('a'),type:'box',bg:'transparent'}]));await page.locator('#layers button').click();
+ await load(page,project([{...element('a'),type:'box',bg:'transparent'}]));await page.locator('#layers button.layer').click();
  await expect(page.locator('#pBgTransparent')).toBeChecked();await page.locator('#pBgTransparent').uncheck();await expect(page.locator('.element svg g')).toHaveAttribute('fill','#ffffff');
  await setTransparency(page,50);await page.locator('#pBg').evaluate(n=>{n.value='#ff0000';n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}))});await expect(page.locator('.element svg g')).toHaveAttribute('fill','rgba(255,0,0,0.5)');
 });
