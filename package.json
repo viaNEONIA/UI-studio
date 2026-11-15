@@ -9,7 +9,7 @@
     "build": "node scripts/build.mjs"
   },
   "engines": {
-    "node": ">=22"
+    "node": "24.x"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
