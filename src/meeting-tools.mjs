@@ -23,7 +23,7 @@ async function raster(node,width,height){
  }
  const canvas=await html2canvas(node,{scale:Math.min(2,3200/Math.max(width,height)),width,height,backgroundColor:'#ffffff',logging:false,allowTaint:false});return canvas.toDataURL('image/png');
 }
-function paperSize(w,h){const preset={'794,1123':[210,297],'1123,794':[297,210],'1123,1587':[297,420],'1587,1123':[420,297]};return preset[w+','+h]||[w*25.4/96,h*25.4/96]}
+function paperSize(w,h){const preset={'794,1123':[210,297],'1123,794':[297,210],'1123,1587':[297,420],'1587,1123':[420,297],'1587,2245':[420,594],'2245,1587':[594,420],'2245,3179':[594,841],'3179,2245':[841,594]};return preset[w+','+h]||[w*25.4/96,h*25.4/96]}
 async function exportPDF(images,width,height){const [w,h]=paperSize(width,height),orientation=w>h?'landscape':'portrait',pdf=new jsPDF({unit:'mm',format:[w,h],orientation,compress:true});for(let i=0;i<images.length;i++){if(i)pdf.addPage([w,h],orientation);pdf.addImage(images[i],'PNG',0,0,w,h,undefined,'FAST')}return pdf.output('blob')}
 async function exportPPTX(images,width,height,names){const [w,h]=paperSize(width,height),pptx=new PptxGenJS();pptx.defineLayout({name:'DOCUMENT',width:w/25.4,height:h/25.4});pptx.layout='DOCUMENT';pptx.author='UI Studio';pptx.subject='会議資料（画像として出力）';for(let i=0;i<images.length;i++){const slide=pptx.addSlide();slide.addImage({data:images[i],x:0,y:0,w:w/25.4,h:h/25.4});slide.addNotes(names[i])}return pptx.write({outputType:'blob'})}
 window.MeetingTools={readPDF,raster,exportPDF,exportPPTX,paperSize};
