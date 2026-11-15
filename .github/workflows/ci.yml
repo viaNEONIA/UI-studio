@@ -29,6 +29,6 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: success()
         with:
-          name: ui-studio-app
+          name: kaigi-note-app
           path: dist/
           retention-days: 14

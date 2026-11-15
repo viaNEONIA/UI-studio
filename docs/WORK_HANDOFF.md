@@ -1,10 +1,11 @@
-# ChatGPT Work 引継ぎ指示
+# 会議ノート — ChatGPT Work 引継ぎ指示
 
 ## 対象
-- Repository: `viaNEONIA/UI-Studio`（作成後）
+- Repository: `viaNEONIA/UI-studio`
+- Software: 会議ノート（旧名称 UI Studio）
 - Baseline: v0.6
 - Runtime: 静的HTML/CSS/JavaScript、PCブラウザ
-- 目的: Android等のUIラフを作り、JSONをChatGPTに渡して実装仕様を共有する
+- 目的: 図面への書込み・会議メモ・会議資料・UIラフの編集。PC内の単独HTMLで使用する。
 
 ## 最初の作業（優先順）
 1. `index.html` のコード監査。実装機能と未実装・不具合を区別し、報告する。
@@ -18,7 +19,7 @@
 - テストの実行コマンド・結果・未検証項目を明記する。
 - UIのスクリーンショットはテストで取得した実画面を使い、生成イメージと混同しない。
 - JSONの旧形式を壊さない。破壊的変更時は移行手順を添える。
-- PC内で使う `dist/index.html` の単独動作と、CIの配布物 `ui-studio-app` の生成を確認する。GitHub Pagesへの公開は不要。
+- PC内で使う `dist/index.html` の単独動作と、CIの配布物 `kaigi-note-app` の生成を確認する。GitHub Pagesへの公開は不要。
 
 ## 注意
 - 現在の `npm test` はスモークテストのみで、UI操作の正常性を保証しない。

@@ -10,7 +10,7 @@ const baseline = readFileSync(new URL('../docs/v0.6.sha256', import.meta.url), '
 test('HTML document has core structure', () => {
   assert.match(html, /<!doctype html>/i);
   assert.match(html, /<html[^>]*lang="ja"/i);
-  assert.match(html, /<title>.*UI Studio/i);
+  assert.match(html, /<title>.*会議ノート/i);
 });
 
 test('inline JavaScript parses', () => {
