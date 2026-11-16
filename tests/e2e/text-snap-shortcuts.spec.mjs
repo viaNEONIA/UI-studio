@@ -39,3 +39,7 @@ test('standalone file has text placement, key help and text color editing offlin
 test('legacy CSS text colors are displayed correctly and unchanged confirmation preserves the original value',async({page})=>{
  await load(page,[item('legacy','text',50,150,240,120,{text:'既存の注記',color:'rgb(255, 0, 0)'})]);const before=await saved(page);await page.locator('.element').dblclick();await expect(page.locator('#objectTextColor')).toHaveValue('#ff0000');await page.locator('#commitObjectText').click();expect(await saved(page)).toEqual(before);
 });
+
+test('key list opened during placement blocks Enter, deletion, undo and panning behind the dialog',async({page})=>{
+ await blur(page);await page.keyboard.press('t');await at(page,200,300);await page.keyboard.press('?');await page.locator('#closeShortcuts').focus();const scroll=await page.locator('#workspace').evaluate(n=>[n.scrollLeft,n.scrollTop]);await page.keyboard.press('Delete');await page.keyboard.press('Control+z');await page.keyboard.press('ArrowDown');expect(await page.locator('#workspace').evaluate(n=>[n.scrollLeft,n.scrollTop])).toEqual(scroll);await page.locator('#shortcutTitle').evaluate(n=>{n.tabIndex=-1;n.focus()});await page.keyboard.press('Enter');await expect(page.locator('.element')).toHaveCount(0);await expect(page.locator('#shortcutDialog')).toBeVisible();await page.keyboard.press('Escape');await at(page,200,300);await page.keyboard.press('Enter');await expect(page.locator('.element')).toHaveCount(1);
+});
