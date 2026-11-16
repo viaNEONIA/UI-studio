@@ -1,3 +1,4 @@
+import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {jsPDF} from 'jspdf';
@@ -12,7 +13,7 @@ test('PDF pages become locked bottom backgrounds; edits and full JSON/HTML round
  await page.locator('#preset').selectOption('794,1123');await importPDF(page);
  const p=await saved(page);expect(p.screens).toHaveLength(2);expect(p.screens[0].background.locked).toBe(true);expect(p.screens[0].background.src).toMatch(/^data:image\/png;base64,/);
  await expect(page.locator('#device > img.document-background')).toHaveCount(1);await expect(page.locator('#layers .background-row')).toHaveCount(1);
- await page.locator('#components button').filter({hasText:'テキスト'}).first().click();await page.locator('#pText').fill('打合せの確認事項');
+ await page.locator('#components button').filter({hasText:'テキスト'}).first().click();await placePendingObject(page);await page.locator('#pText').fill('打合せの確認事項');
  const annotated=await saved(page);expect(annotated.screens[0].elements).toHaveLength(1);
  await page.locator('#bgLocked').uncheck();await page.locator('#bgOpacity').fill('60');await page.locator('#bgOpacity').dispatchEvent('change');await expect(page.locator('.document-background')).toHaveCSS('opacity','0.6');
  await page.locator('#bgVisible').uncheck();await expect(page.locator('#device .document-background')).toHaveCount(0);await page.locator('#bgVisible').check();
@@ -42,7 +43,7 @@ test('local recovery preserves embedded backgrounds across reload',async({page})
 test('standalone file imports PDF without network and background replacement preserves notes',async({page})=>{
  const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);
  const outbound=[];page.on('request',r=>{if(/^https?:/.test(r.url()))outbound.push(r.url())});await importPDF(page);
- await page.locator('#components button').getByText('テキスト',{exact:true}).click();await page.locator('#pText').fill('残す注記');
+ await page.locator('#components button').getByText('テキスト',{exact:true}).click();await placePendingObject(page);await page.locator('#pText').fill('残す注記');
  const before=await saved(page),single=new jsPDF();single.text('Replacement',20,30);await page.locator('#replaceFile').setInputFiles({name:'replacement.pdf',mimeType:'application/pdf',buffer:Buffer.from(single.output('arraybuffer'))});await expect(page.locator('#meetingStatus')).toContainText('取り込みました');
  const after=await saved(page);expect(after.screens).toHaveLength(2);expect(after.screens[0].elements).toEqual(before.screens[0].elements);expect(after.screens[0].background.name).toContain('replacement.pdf');expect(outbound).toEqual([]);
  await page.locator('#bgRemove').click();expect((await saved(page)).screens[0].background).toBeUndefined();await page.locator('#undo').click();expect(await saved(page)).toEqual(after);

@@ -16,7 +16,7 @@ test('Material panel collapses while shapes stay available; shape fill and outli
 test('locked layers resist drag, text edit, deletion and group movement; unlock restores editing',async({page})=>{
  await page.locator('#addBox').click();await placePendingObject(page);await page.locator('#pLocked').check();await expect(page.locator('#pText')).toBeDisabled();const before=await saved(page),b=await page.locator('.element').boundingBox();
  await page.mouse.move(b.x+20,b.y+20);await page.mouse.down();await page.mouse.move(b.x+70,b.y+40);await page.mouse.up();await page.keyboard.press('Delete');expect(await saved(page)).toEqual(before);
- await page.locator('#components button').getByText('テキスト',{exact:true}).click();await page.locator('#layers .layer').nth(1).click({modifiers:['Control'],force:true});await page.locator('#layers .layer').first().click();await expect(page.locator('#alignLeft')).toBeDisabled();expect((await saved(page)).screens[0].elements[0]).toEqual(before.screens[0].elements[0]);
+ await page.locator('#components button').getByText('テキスト',{exact:true}).click();await placePendingObject(page);await page.locator('#layers .layer').nth(1).click({modifiers:['Control'],force:true});await page.locator('#layers .layer').first().click();await expect(page.locator('#alignLeft')).toBeDisabled();expect((await saved(page)).screens[0].elements[0]).toEqual(before.screens[0].elements[0]);
  await page.locator('#layers .layer-lock').nth(1).click();await page.locator('#layers .layer').nth(1).click();await expect(page.locator('#pText')).toBeEnabled();await page.locator('#pText').fill('編集可');expect((await saved(page)).screens[0].elements[0].text).toBe('編集可');
 });
 test('stamp image can be placed repeatedly and saved with its palette',async({page})=>{
@@ -25,7 +25,7 @@ test('stamp image can be placed repeatedly and saved with its palette',async({pa
  await page.locator('#file').setInputFiles({name:'stamp-project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await expect(page.locator('#stampPalette button')).toHaveCount(1);expect(await saved(page)).toEqual(p);
 });
 test('text aligns horizontally and vertically without changing the outer position',async({page})=>{
- await page.locator('#components button').getByText('テキスト',{exact:true}).click();const before=(await saved(page)).screens[0].elements[0];await page.locator('#pTextAlign').selectOption('center');await page.locator('#pTextVertical').selectOption('bottom');
+ await page.locator('#components button').getByText('テキスト',{exact:true}).click();await placePendingObject(page);const before=(await saved(page)).screens[0].elements[0];await page.locator('#pTextAlign').selectOption('center');await page.locator('#pTextVertical').selectOption('bottom');
  await expect(page.locator('.element > div').first()).toHaveCSS('text-align','center');const bounds=await page.locator('.element > div').first().boundingBox(),textBounds=await page.locator('.element > div > div').first().boundingBox();expect(Math.abs(bounds.y+bounds.height-textBounds.y-textBounds.height)).toBeLessThan(1);const after=(await saved(page)).screens[0].elements[0];expect([after.x,after.y,after.w,after.h]).toEqual([before.x,before.y,before.w,before.h]);
 });
 test('Ctrl wheel zoom, middle drag and arrow pan work in editing and viewing',async({page})=>{
