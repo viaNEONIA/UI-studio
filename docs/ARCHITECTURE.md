@@ -2,7 +2,9 @@
 
 - `index.html`: 既存エディターのHTML/CSS/JavaScriptソース。会議用ライブラリと編集処理の挿入マーカーを含む。
 - 会議・背景管理・画像取込・ページ移動・手のひら・自動復旧の処理は `index.html` に含める。基本操作はビルド時のコード挿入に依存しない。PDF/PPTXライブラリだけをビルド時に同梱する。
-- `src/meeting-tools.mjs`: PDF.jsによる画像化、html2canvasによるページ合成、jsPDFとPptxGenJSによる書き出し。配布版ではMeetingToolsとして利用。
+- `src/meeting-tools.mjs`: PDF背景処理の公開API、html2canvasによるページ合成、jsPDFとPptxGenJSによる書き出し。配布版ではMeetingToolsとして利用。
+- `src/pdf-background.mjs`: PDF.jsの取込と再描画、1文書の解析キャッシュ、キャンセル可能な直列描画キュー。
+- `src/pdf-render-plan.mjs`: ページの配置・表示領域・倍率から描画範囲と解像度を計算。最大8192px/辺・約840万画素に制限。
 - `scripts/build.mjs`: esbuildでライブラリとPDF標準フォント/CMap/画像デコーダをまとめ、単独ファイルの`dist/index.html`を生成。第三者ライセンス表示も生成。
 - `tests/fixtures/v0.6.html`: SHA256で照合する旧原本。
 - `tests/e2e`: Chromiumで既存編集操作と会議資料の入出力を検証。サーバーはdistを提供し、file://起動も検証する。
@@ -17,11 +19,13 @@
 
 JSON version:1、width/height、screens/elementsの構造は維持する。背景は画面ごとの任意フィールド`background`へ、PNGのdata URL、配置、透明度、表示/ロック、名前を保存する。背景をelementsへ混ぜないため、部品の前後操作で背景が上へ出ない。旧JSONに背景フィールドは不要。
 
-PDFの元バイト列は保持しない。PDF/画像は最長辺2400px以内のPNG背景に変換する。背景を同梱したJSON/HTMLは元ファイルへのパスに依存しない。
+PDFの元バイト列はプロジェクトの任意フィールド `pdfSources` に文書ごとに1つのBase64文字列として保持する。各背景の任意フィールド `pdf` は `sourceId/pageNumber/pageWidth/pageHeight` を保存する。プレビューPNGは取込時に最大144dpi相当・長辺約2400pxで作成し、旧形式の背景とも互換性を維持する。JSON・自動復元に元PDFを含める。未参照ソースは削除し、Undo用スナップショットには削除前データを残す。
+
+編集画面では元PDFから表示領域だけをキャンバスへ再描画する。拡大縮小・スクロール・ページ切替で古い要求を取り消し、完了した最新の結果だけを表示する。描画タイルは保存データに入れない。透明度は重複合成せず、背景移動の入力は従来の画像要素で受け取る。元PDFがない旧データや未ビルドHTMLはPNGプレビューを表示する。保存済みの元PDFから描画できない場合もプレビューを残す。
 
 ## 出力
 
-HTMLは背景と既存の要素を同梱したページ切替プレビュー。PDF/PPTXは全画面を描画して画像として合成する。A4/A3は規定mmサイズを使い、その他は96px/inで換算する。PPTXは1画面1スライドの画像であり、内部要素を個別編集する出力ではない。
+HTMLは背景と既存の要素を同梱したページ切替プレビュー。PNG/PPTXは全画面を画像として合成する。PDFは `pdf-vector-core.mjs` で元PDFページをForm XObjectとして保持し、通常の文字・線・図形をベクターで重ねる。`pdf-vector-export.mjs` はDOMから文字位置とSVGパスを取得し、複雑なUI部品のみ部品単位の透過PNGにする。元PDFのCropBoxと90度単位の回転、透明グループ、ページ内のクリップを処理する。日本語フォントは同梱TrueType（gzip）を展開して埋め込む。CFF/WOFFのサブセットは互換性検証で文字欠落を認めたため採用しない。注釈・フォーム等、追加CSS、未収録文字は出力前に検査する。A4/A3は規定mmサイズを使い、その他は96px/inで換算する。PPTXは1画面1スライドの画像であり、内部要素を個別編集する出力ではない。
 
 HTML部品と外部URL画像を含むPDF/PPTX出力はエラーで中止する。追加CSSやフォント差など、ブラウザ上のすべての表現を完全に再現することは保証しない。
 

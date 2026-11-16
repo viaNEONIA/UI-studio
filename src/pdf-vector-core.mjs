@@ -1,0 +1,38 @@
+import {PDFDocument,PDFName,PDFObjectCopier,PDFRawStream,rgb,degrees,LineCapStyle,LineJoinStyle,pushGraphicsState,popGraphicsState,concatTransformationMatrix,rectangle,clip,endPath,setLineJoin} from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+export function backgroundPlacement(b,meta,crop,rotation,pageHeight){
+ const angle=((rotation%360)+360)%360;if(![0,90,180,270].includes(angle))throw Error('元PDFの回転角度に対応していません');
+ const fit=Math.min(b.w/meta.pageWidth,b.h/meta.pageHeight),w=meta.pageWidth*fit,h=meta.pageHeight*fit,left=b.x+(b.w-w)/2,bottom=pageHeight-b.y-(b.h-h)/2-h;
+ const x=left+([180,270].includes(angle)?w:0),y=bottom+([90,180].includes(angle)?h:0);
+ return {x,y,xScale:(angle%180?h:w)/crop.width,yScale:(angle%180?w:h)/crop.height,rotate:degrees(-angle),opacity:b.opacity};
+}
+function clipBox(page,x,y,w,h){page.pushOperators(pushGraphicsState(),rectangle(x,y,w,h),clip(),endPath())}
+const color=c=>c?rgb(c[0]/255,c[1]/255,c[2]/255):undefined;
+export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress}={}){
+ const doc=await PDFDocument.create();doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(fontkit);
+ let font;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:false});const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
+ const embedded=new Map();
+ for(const sourceId of new Set(project.screens.filter(s=>s.background?.visible&&s.background.pdf).map(s=>s.background.pdf.sourceId))){
+  const source=project.pdfSources?.[sourceId];if(!source)throw Error('元PDFがありません');const input=await PDFDocument.load(Uint8Array.from(atob(source),c=>c.charCodeAt(0)),{updateMetadata:false});
+  const indexes=[...new Set(project.screens.filter(s=>s.background?.visible&&s.background.pdf?.sourceId===sourceId).map(s=>s.background.pdf.pageNumber-1))],pages=indexes.map(i=>{if(i<0||i>=input.getPageCount())throw Error('元PDFのページ番号が正しくありません');return input.getPage(i)});
+  for(const page of pages)if(page.node.Annots()?.size())throw Error('元PDFに注釈・フォーム・リンクがあります。欠落を防ぐためベクター出力を中止しました。元PDF側で注釈等をページ内容に統合してから取り込んでください');
+  for(const p of pages)if(!p.node.Contents())p.pushOperators(pushGraphicsState(),popGraphicsState());
+  const boxes=pages.map(p=>{const b=p.getCropBox();return {left:b.x,bottom:b.y,right:b.x+b.width,top:b.y+b.height}}),forms=await doc.embedPages(pages,boxes),copier=PDFObjectCopier.for(input.context,doc.context);
+  for(let i=0;i<forms.length;i++){const form=forms[i];await form.embed();const stream=doc.context.lookup(form.ref,PDFRawStream),group=pages[i].node.get(PDFName.of('Group'));stream.dict.set(PDFName.of('Group'),group?copier.copy(group):doc.context.obj({S:'Transparency',I:true,CS:'DeviceRGB'}));embedded.set(sourceId+':'+(indexes[i]+1),{form,crop:pages[i].getCropBox(),rotation:pages[i].getRotation().angle})}
+ }
+ const [mmW,mmH]=paperMM||[project.width*25.4/96,project.height*25.4/96],pw=mmW*72/25.4,ph=mmH*72/25.4;
+ let rasterized=0;
+ for(let i=0;i<prepared.length;i++){
+  onProgress?.(i+1,prepared.length);const page=doc.addPage([pw,ph]),sc=project.screens[i];page.drawRectangle({x:0,y:0,width:pw,height:ph,color:rgb(1,1,1)});page.pushOperators(pushGraphicsState(),concatTransformationMatrix(pw/project.width,0,0,ph/project.height,0,0));clipBox(page,0,0,project.width,project.height);
+  const bg=sc.background;if(bg?.visible){if(bg.pdf){const item=embedded.get(bg.pdf.sourceId+':'+bg.pdf.pageNumber);page.drawPage(item.form,backgroundPlacement(bg,bg.pdf,item.crop,item.rotation,project.height))}else{const image=await embedImage(doc,bg.src);const fit=Math.min(bg.w/image.width,bg.h/image.height),w=image.width*fit,h=image.height*fit;page.drawImage(image,{x:bg.x+(bg.w-w)/2,y:project.height-bg.y-(bg.h-h)/2-h,width:w,height:h,opacity:bg.opacity})}}
+  for(const e of prepared[i].elements){
+   const bottom=project.height-e.y-e.h;
+   if(e.paths){page.pushOperators(pushGraphicsState(),setLineJoin(LineJoinStyle.Round));for(const path of e.paths){const fill=path.fill?.[3]>0?color(path.fill):undefined,stroke=path.stroke?.[3]>0&&path.width>0?color(path.stroke):undefined;if(fill||stroke)page.drawSvgPath(path.d,{x:e.x,y:project.height-e.y,scale:1,color:fill,borderColor:stroke,borderWidth:stroke?path.width:0,opacity:path.fill?.[3]??1,borderOpacity:(path.stroke?.[3]??1)*path.strokeOpacity,borderLineCap:LineCapStyle.Round})}page.pushOperators(popGraphicsState())}
+   if(e.image){clipBox(page,e.x,bottom,e.w,e.h);const image=await embedImage(doc,e.image),fit=e.cover?Math.max(e.w/image.width,e.h/image.height):1,w=e.cover?image.width*fit:e.w,h=e.cover?image.height*fit:e.h;page.drawImage(image,{x:e.x+(e.w-w)/2,y:bottom+(e.h-h)/2,width:w,height:h});page.pushOperators(popGraphicsState());if(e.rasterized)rasterized++}
+   if(e.textRuns?.length){clipBox(page,e.x,bottom,e.w,e.h);for(const run of e.textRuns)page.drawText(run.text,{x:run.x,y:project.height-run.baseline,font,size:run.size,color:color(run.color),opacity:run.color[3]});page.pushOperators(popGraphicsState())}
+  }
+  page.pushOperators(popGraphicsState(),popGraphicsState());
+ }
+ return {bytes:await doc.save({useObjectStreams:false}),rasterized};
+}
+async function embedImage(doc,src){if(/^data:image\/jpe?g;/i.test(src))return doc.embedJpg(src);return doc.embedPng(src)}
