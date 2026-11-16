@@ -25,3 +25,13 @@ test('unsupported font glyphs fail instead of silently becoming missing boxes',a
 test('source annotations are detected before producing an incomplete vector document',async()=>{
  const src=await PDFDocument.create(),page=src.addPage();page.node.set(PDFName.of('Annots'),src.context.obj([src.context.obj({Type:'Annot',Subtype:'Text',Rect:[0,0,10,10]})]));const project=structuredClone(base);project.pdfSources={a:Buffer.from(await src.save()).toString('base64')};project.screens[0].background={x:0,y:0,w:100,h:100,opacity:1,visible:true,pdf:{sourceId:'a',pageNumber:1,pageWidth:100,pageHeight:100}};await assert.rejects(composeVectorPDF(project,[{elements:[]}]),/注釈/);
 });
+
+test('measured glyph placement preserves editor ink bounds without using the embedded font to wrap',async()=>{
+ const {textRunPlacement}=await import('../src/pdf-vector-core.mjs');const kit=(await import('@pdf-lib/fontkit')).default,metrics=kit.create(fontBytes),doc=await PDFDocument.create();doc.registerFontkit(kit);const embedded=await doc.embedFont(fontBytes);
+ for(const text of ['i','W','国','が']){const run={text,x:20,baseline:40,size:22,width:19,ink:{left:1,right:15,ascent:17,descent:3}},p=textRunPlacement(run,embedded,metrics),b=metrics.layout(text).glyphs[0].bbox,u=run.size/metrics.unitsPerEm;assert.ok(Math.abs(p.x+b.minX*u*p.sx-(run.x-run.ink.left))<1e-8);assert.ok(Math.abs(p.x+b.maxX*u*p.sx-(run.x+run.ink.right))<1e-8);assert.ok(Math.abs(p.y+b.maxY*u*p.sy-(-run.baseline+run.ink.ascent))<1e-8);assert.ok(Math.abs(p.y+b.minY*u*p.sy-(-run.baseline-run.ink.descent))<1e-8)}
+});
+test('spaces and older prepared text remain finite and keep their original baseline',async()=>{
+ const {textRunPlacement}=await import('../src/pdf-vector-core.mjs'),kit=(await import('@pdf-lib/fontkit')).default,metrics=kit.create(fontBytes),doc=await PDFDocument.create();doc.registerFontkit(kit);const embedded=await doc.embedFont(fontBytes);
+ assert.deepEqual(textRunPlacement({text:'A',x:12,baseline:30,size:18},embedded,metrics),{sx:1,sy:1,x:12,y:-30});
+ const p=textRunPlacement({text:' ',x:12,baseline:30,size:18,width:8,ink:{left:0,right:0,ascent:0,descent:0}},embedded,metrics);assert.equal(p.y,-30);assert.ok(Number.isFinite(p.sx)&&p.sx>0);
+});

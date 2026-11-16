@@ -8,9 +8,21 @@ export function backgroundPlacement(b,meta,crop,rotation,pageHeight){
 }
 function clipBox(page,x,y,w,h){page.pushOperators(pushGraphicsState(),rectangle(x,y,w,h),clip(),endPath())}
 const color=c=>c?rgb(c[0]/255,c[1]/255,c[2]/255):undefined;
+// Match each embedded glyph's ink to the editor's measured glyph, without rewrapping text.
+export function textRunPlacement(run,font,metrics){
+ let sx=1,sy=1,x=run.x,y=-run.baseline;
+ if(Number.isFinite(run.width)&&run.width>=0){const advance=font.widthOfTextAtSize(run.text,run.size);if(advance>0)sx=run.width/advance}
+ const ink=run.ink;
+ if(ink&&Object.values(ink).every(Number.isFinite)&&ink.left+ink.right>0&&ink.ascent+ink.descent>0){
+  const glyphs=metrics.layout(run.text).glyphs,unit=run.size/metrics.unitsPerEm;let pen=0,minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const glyph of glyphs){const b=glyph.bbox;if([b.minX,b.maxX,b.minY,b.maxY].every(Number.isFinite)){minX=Math.min(minX,pen+b.minX);maxX=Math.max(maxX,pen+b.maxX);minY=Math.min(minY,b.minY);maxY=Math.max(maxY,b.maxY)}pen+=glyph.advanceWidth}
+  if(maxX>minX&&maxY>minY){sx=(ink.left+ink.right)/((maxX-minX)*unit);sy=(ink.ascent+ink.descent)/((maxY-minY)*unit);x=run.x-ink.left-minX*unit*sx;y=-run.baseline-ink.descent-minY*unit*sy}
+ }
+ return {sx,sy,x,y};
+}
 export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress}={}){
  const doc=await PDFDocument.create();doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(fontkit);
- let font;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:false});const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
+ let font,metrics;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:false});metrics=fontkit.create(fontBytes);const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
  const embedded=new Map();
  for(const sourceId of new Set(project.screens.filter(s=>s.background?.visible&&s.background.pdf).map(s=>s.background.pdf.sourceId))){
   const source=project.pdfSources?.[sourceId];if(!source)throw Error('元PDFがありません');const input=await PDFDocument.load(Uint8Array.from(atob(source),c=>c.charCodeAt(0)),{updateMetadata:false});
@@ -29,7 +41,7 @@ export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onPro
    const bottom=project.height-e.y-e.h;
    if(e.paths){page.pushOperators(pushGraphicsState(),setLineJoin(LineJoinStyle.Round));for(const path of e.paths){const fill=path.fill?.[3]>0?color(path.fill):undefined,stroke=path.stroke?.[3]>0&&path.width>0?color(path.stroke):undefined;if(fill||stroke)page.drawSvgPath(path.d,{x:e.x,y:project.height-e.y,scale:1,color:fill,borderColor:stroke,borderWidth:stroke?path.width:0,opacity:path.fill?.[3]??1,borderOpacity:(path.stroke?.[3]??1)*path.strokeOpacity,borderLineCap:LineCapStyle.Round})}page.pushOperators(popGraphicsState())}
    if(e.image){clipBox(page,e.x,bottom,e.w,e.h);const image=await embedImage(doc,e.image),fit=e.cover?Math.max(e.w/image.width,e.h/image.height):1,w=e.cover?image.width*fit:e.w,h=e.cover?image.height*fit:e.h;page.drawImage(image,{x:e.x+(e.w-w)/2,y:bottom+(e.h-h)/2,width:w,height:h});page.pushOperators(popGraphicsState());if(e.rasterized)rasterized++}
-   if(e.textRuns?.length){clipBox(page,e.x,bottom,e.w,e.h);for(const run of e.textRuns)page.drawText(run.text,{x:run.x,y:project.height-run.baseline,font,size:run.size,color:color(run.color),opacity:run.color[3]});page.pushOperators(popGraphicsState())}
+   if(e.textRuns?.length){clipBox(page,e.x,bottom,e.w,e.h);for(const run of e.textRuns){const p=textRunPlacement(run,font,metrics);page.pushOperators(pushGraphicsState(),concatTransformationMatrix(p.sx,0,0,p.sy,p.x,project.height+p.y));page.drawText(run.text,{x:0,y:0,font,size:run.size,color:color(run.color),opacity:run.color[3]});page.pushOperators(popGraphicsState())}page.pushOperators(popGraphicsState())}
   }
   page.pushOperators(popGraphicsState(),popGraphicsState());
  }
