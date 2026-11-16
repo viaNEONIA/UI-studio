@@ -1,5 +1,6 @@
 import {PDFDocument,PDFName,PDFObjectCopier,PDFRawStream,rgb,degrees,LineCapStyle,LineJoinStyle,pushGraphicsState,popGraphicsState,concatTransformationMatrix,rectangle,clip,endPath,setLineJoin} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import {alignedFontkit} from './pdf-fontkit.mjs';
 export function backgroundPlacement(b,meta,crop,rotation,pageHeight){
  const angle=((rotation%360)+360)%360;if(![0,90,180,270].includes(angle))throw Error('元PDFの回転角度に対応していません');
  const fit=Math.min(b.w/meta.pageWidth,b.h/meta.pageHeight),w=meta.pageWidth*fit,h=meta.pageHeight*fit,left=b.x+(b.w-w)/2,bottom=pageHeight-b.y-(b.h-h)/2-h;
@@ -21,7 +22,7 @@ export function textRunPlacement(run,font,metrics){
  return {sx,sy,x,y};
 }
 export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress}={}){
- const doc=await PDFDocument.create();doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(fontkit);
+ const doc=await PDFDocument.create();doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(alignedFontkit);
  let font,metrics;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:true});metrics=fontkit.create(fontBytes);const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
  const images=new Map(),imageFor=src=>{if(!images.has(src))images.set(src,embedImage(doc,src));return images.get(src)};
  const embedded=new Map();

@@ -44,3 +44,8 @@ test('repeated backgrounds and placed copies share the same embedded image data'
  const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
  const p={...base,screens:['a','b'].map(id=>({id,name:id,elements:[],background:{src:png,x:0,y:0,w:100,h:100,visible:true,opacity:1}}))},e={x:120,y:100,w:100,h:100,image:png};const {bytes}=await composeVectorPDF(p,[{elements:[e,e]},{elements:[e]}]);const out=await PDFDocument.load(bytes),refs=out.getPages().flatMap(page=>page.node.Resources().lookup(PDFName.of('XObject')).values().map(r=>r.toString()));assert.equal(new Set(refs).size,1);
 });
+
+test('TrueType subsets keep odd-length Japanese glyph records intact instead of truncating loca offsets',async()=>{
+ const {alignedFontkit}=await import('../src/pdf-fontkit.mjs'),raw=(await import('@pdf-lib/fontkit')).default,source=alignedFontkit.create(fontBytes),subset=source.createSubset(),glyphs=[...new Set([...('会議の確認事項照明位置を変更がéABC')].map(ch=>source.glyphForCodePoint(ch.codePointAt(0)).id))],mapping=glyphs.map(id=>[id,subset.includeGlyph(id)]);
+ const data=await new Promise((resolve,reject)=>{const parts=[];subset.encodeStream().on('data',b=>parts.push(b)).on('error',reject).on('end',()=>resolve(new Uint8Array(Buffer.concat(parts))))}),decoded=raw.create(data);assert.ok(decoded.loca.offsets.every(n=>n%2===0));for(const [original,id]of mapping)assert.deepEqual(decoded.getGlyph(id).path.commands,source.getGlyph(original).path.commands,'glyph '+original+' must retain every contour');
+});
