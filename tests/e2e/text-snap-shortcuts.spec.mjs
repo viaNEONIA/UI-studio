@@ -35,3 +35,7 @@ test('confirming unchanged text appearance adds no history or alignment keys',as
 test('standalone file has text placement, key help and text color editing offline',async({page})=>{
  const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);const outbound=[];page.on('request',r=>{if(/^https?:/.test(r.url()))outbound.push(r.url())});await blur(page);await page.keyboard.press('t');await placePendingObject(page);await page.locator('.element').dblclick();await page.locator('#objectTextPalette [data-color="#ff0000"]').click();await page.keyboard.press('Control+Enter');expect((await saved(page)).screens[0].elements[0].color).toBe('#ff0000');await page.locator('#showShortcuts').click();await expect(page.locator('#shortcutDialog')).toBeVisible();expect(outbound).toEqual([]);
 });
+
+test('legacy CSS text colors are displayed correctly and unchanged confirmation preserves the original value',async({page})=>{
+ await load(page,[item('legacy','text',50,150,240,120,{text:'既存の注記',color:'rgb(255, 0, 0)'})]);const before=await saved(page);await page.locator('.element').dblclick();await expect(page.locator('#objectTextColor')).toHaveValue('#ff0000');await page.locator('#commitObjectText').click();expect(await saved(page)).toEqual(before);
+});
