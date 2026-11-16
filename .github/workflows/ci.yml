@@ -1,5 +1,9 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
 permissions:
   contents: read
 jobs:
@@ -17,6 +21,8 @@ jobs:
       - run: npm run test:e2e
       - name: Reproduce original v0.6 regressions
         run: BASELINE=1 npm run test:e2e -- --grep "group at edge|invalid import|export escapes"
+      - name: Package release assets
+        run: node scripts/package-release.mjs
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -32,3 +38,35 @@ jobs:
           name: kaigi-note-app
           path: dist/
           retention-days: 14
+
+      - uses: actions/upload-artifact@v6
+        if: success()
+        with:
+          name: kaigi-note-release
+          path: release/
+          retention-days: 14
+
+  publish:
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref_type == 'tag' && github.ref_name || 'latest-dev' }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          name: kaigi-note-release
+          path: release/
+      - name: Publish tested release assets
+        run: node scripts/publish-release.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

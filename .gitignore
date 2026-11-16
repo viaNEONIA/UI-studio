@@ -3,3 +3,4 @@ test-results/
 playwright-report/
 baseline-results/
 dist/
+release/

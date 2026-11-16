@@ -14,12 +14,28 @@ PDFや画像を背景に取り込み、線・矢印・図形・文字を重ね�
 
 ### ビルド済みHTMLを取得する
 
-1. [ActionsのCI一覧](https://github.com/viaNEONIA/UI-studio/actions/workflows/ci.yml)を開き、利用する版の成功した実行を選びます。
-2. **Artifacts → `kaigi-note-app`** をダウンロードします。GitHubへのログインが必要な場合があります。
+1. [Releases](https://github.com/viaNEONIA/UI-studio/releases)から正式版、または[最新開発版](https://github.com/viaNEONIA/UI-studio/releases/tag/latest-dev)を開きます。
+2. **Assets → `kaigi-note.zip`** をダウンロードします。単独の `index.html` と `THIRD_PARTY_NOTICES.txt` も添付しています。
 3. ZIPを展開し、`index.html` をPC内の決まった場所へ保存します。
 4. ChromeまたはEdgeで開きます。
 
-CIの配布物は14日間保持されます。PCへダウンロードしたファイルは、その後も使用できます。リポジトリ直下の `index.html` は開発用です。**PDF取込・PNG/PDF/PPTX出力には、ビルド済みの `dist/index.html` を使用してください。**
+ReleaseのファイルにはCI成果物の14日という保存期限はありません。最新開発版は更新され、正式版はバージョンごとに保存されます。従来の[ActionsのCI一覧](https://github.com/viaNEONIA/UI-studio/actions/workflows/ci.yml)からも **Artifacts → `kaigi-note-app`** を取得できます（14日保持・ログインが必要な場合があります）。リポジトリ直下の `index.html` は開発用です。**PDF取込・PNG/PDF/PPTX出力には、ビルド済みのHTMLを使用してください。**
+
+### Releaseの自動更新
+
+- `main`へのpushで全テスト・ビルド・配布ZIPの作成が成功すると、`latest-dev`タグの「会議ノート 最新開発版」を更新します。最新のmainを追い越した古いビルドは公開しません。
+- `v0.7.0`などのバージョンタグをpushすると、同じ検証を通過した成果物で版ごとのReleaseを作成します。`v0.7.0-rc.1`などはプレリリースになります。公開済みの正式版のファイルは再実行で上書きしません。
+- 添付するのは `index.html`、ライセンス同梱の `kaigi-note.zip`、`THIRD_PARTY_NOTICES.txt` です。テストに使ったビルド済みファイルをそのまま使用します。
+- PRと作業ブランチのCIではReleaseを公開しません。公開専用ジョブだけにRelease書込み権限を付与し、追加の個人用トークンは不要です。
+
+正式版を作成する場合は、検証したmainのコミットにタグを付けてpushします。
+
+```sh
+git switch main
+git pull --ff-only
+git tag v0.7.0
+git push origin v0.7.0
+```
 
 ### 起動から保存まで
 
