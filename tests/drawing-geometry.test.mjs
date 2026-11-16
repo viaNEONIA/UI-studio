@@ -43,3 +43,15 @@ test('line completion starts an independent next object and empty Enter does not
 test('placement commits around cursor center and does not commit without a canvas position',()=>{
  const ctx=editorContext(),object=ctx.makeObject('box');ctx.drawing={type:'placement',object,screenId:'s',cursor:null,points:[]};ctx.finishDrawing();assert.equal(ctx.project.screens[0].elements.length,0);ctx.drawing.cursor=[220,250];ctx.finishDrawing();assert.equal(object.x+object.w/2,220);assert.equal(object.y+object.h/2,250);assert.equal(ctx.project.screens[0].elements.length,1);assert.equal(ctx.drawing,null);
 });
+vm.runInContext(fn('satisfiesAngleConstraint'),context);
+vm.runInContext(fn('segmentSnapPoint'),context);
+test('segment snapping projects onto the actual segment and clamps to endpoints',()=>{
+ assert.deepEqual(Array.from(context.segmentSnapPoint([50,100],[350,400],[122,180])),[126,176]);
+ assert.deepEqual(Array.from(context.segmentSnapPoint([50,100],[350,400],[10,10])),[50,100]);
+ assert.equal(context.segmentSnapPoint([1,1],[1,1],[2,2]),null);
+});
+test('constrained segment snapping uses actual intersections without extending segments',()=>{
+ assert.deepEqual(Array.from(context.segmentSnapPoint([50,100],[350,400],[122,180],{axis:1,value:180})),[130,180]);
+ assert.equal(context.segmentSnapPoint([50,100],[350,400],[122,180],{axis:1,value:500}),null);
+ assert.deepEqual(Array.from(context.segmentSnapPoint([50,100],[350,100],[122,110],{axis:1,value:100})),[122,100]);
+});
