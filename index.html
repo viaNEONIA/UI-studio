@@ -212,7 +212,7 @@ function cancelPDFPreview(){clearTimeout(pdfPreviewTimer);pdfPreviewController?.
 function schedulePDFBackground(){
  cancelPDFPreview();const generation=pdfPreviewGeneration,b=screen().background,img=$('device').querySelector('img.document-background'),status=$('pdfQualityStatus');
  const old=$('device').querySelector('.pdf-background-render');if(old){old.remove();old.width=old.height=0}if(img)img.style.maskImage='';
- if(!b?.visible||!b.pdf||!img){status.textContent=b?'画像背景':'';if(pdfRuntimeActive){window.MeetingTools?.releasePDF?.();pdfRuntimeActive=false}return}
+ if(!b?.visible||!b.pdf||!img){status.textContent=b?(b.pdf?'PDF：背景を非表示':'画像背景'):'';if(pdfRuntimeActive){window.MeetingTools?.releasePDF?.();pdfRuntimeActive=false}return}
  if(!window.MeetingTools?.renderPDFRegion){status.textContent='PDF再描画にはビルド済みの配布版を使用してください。現在はプレビューを表示しています';return}
  status.textContent='PDF：表示倍率に合わせて再描画中…';const source=project.pdfSources?.[b.pdf.sourceId],controller=new AbortController();pdfPreviewController=controller;
  pdfPreviewTimer=setTimeout(async()=>{
