@@ -2,15 +2,34 @@ import * as pdfjs from 'pdfjs-dist/build/pdf.mjs';
 import workerSource from 'pdf-worker-code';
 import assets from 'pdf-assets';
 export {planPDFRegion} from './pdf-render-plan.mjs';
-// A Blob module keeps parsing off the UI thread, including standalone file:// use.
-// PDF.js can import the same embedded module as a fake-worker fallback if needed.
-pdfjs.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([workerSource],{type:'text/javascript'}));
+// Start the embedded module directly: PDF.js's cross-origin import wrapper cannot
+// import a second opaque-origin Blob when the standalone HTML uses file://.
+const workerURL=URL.createObjectURL(new Blob([workerSource],{type:'text/javascript'}));
+pdfjs.GlobalWorkerOptions.workerSrc=workerURL;
+async function startPDFWorker(){
+ const port=new Worker(workerURL,{type:'module'});
+ try{
+  await new Promise((resolve,reject)=>{
+   const finish=error=>{clearTimeout(timer);port.removeEventListener('message',ready);port.removeEventListener('error',failed);error?reject(error):resolve()};
+   const ready=event=>{if(event.data?.sourceName==='worker'&&event.data?.action==='ready')finish()};
+   const failed=()=>finish(Error('PDF workerを起動できませんでした'));
+   const timer=setTimeout(failed,10000);port.addEventListener('message',ready);port.addEventListener('error',failed);
+  });
+  return {worker:new pdfjs.PDFWorker({port}),port};
+ }catch(error){port.terminate();throw error}
+}
 class EmbeddedBinaryData { async fetch({kind,filename}) { const encoded=assets[kind+'/'+filename];if(!encoded)throw Error('PDFリソースが見つかりません: '+filename);return Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)); } }
-function openPDF(data){const task=pdfjs.getDocument({data,isEvalSupported:false,useWorkerFetch:false,BinaryDataFactory:EmbeddedBinaryData,cMapPacked:true,useWasm:true});let passwordReject;const passwordError=new Promise((_,reject)=>passwordReject=reject);task.onPassword=()=>passwordReject(Error('パスワード付きPDFには対応していません'));return {task,document:Promise.race([task.promise,passwordError])}}
+async function openPDF(data){
+ let native;try{native=await startPDFWorker()}catch{/* PDF.js loads the embedded fake-worker fallback when Worker is blocked. */}
+ let task;
+ try{task=pdfjs.getDocument({data,worker:native?.worker,isEvalSupported:false,useWorkerFetch:false,BinaryDataFactory:EmbeddedBinaryData,cMapPacked:true,useWasm:true})}catch(error){native?.worker.destroy();native?.port.terminate();throw error}
+ let passwordReject;const passwordError=new Promise((_,reject)=>passwordReject=reject);task.onPassword=()=>passwordReject(Error('パスワード付きPDFには対応していません'));
+ return {document:Promise.race([task.promise,passwordError]),task:{async destroy(){try{await task.destroy()}finally{native?.worker.destroy();native?.port.terminate()}}}};
+}
 function encode(bytes){const pieces=[];for(let i=0;i<bytes.length;i+=32768)pieces.push(String.fromCharCode(...bytes.subarray(i,i+32768)));return btoa(pieces.join(''))}
 export async function readPDF(file,onProgress){
  if(file.size>50*1024*1024)throw Error('PDFは50MB以内にしてください');
- const bytes=new Uint8Array(await file.arrayBuffer()),source=encode(bytes),opened=openPDF(bytes);let pdf;
+ const bytes=new Uint8Array(await file.arrayBuffer()),source=encode(bytes),opened=await openPDF(bytes);let pdf;
  try {pdf=await opened.document;if(pdf.numPages>50)throw Error('PDFは50ページ以内にしてください');const pages=[];
  for(let i=1;i<=pdf.numPages;i++){
   onProgress?.(i,pdf.numPages);const page=await pdf.getPage(i),initial=page.getViewport({scale:1}),scale=Math.min(2,2400/Math.max(initial.width,initial.height)),view=page.getViewport({scale}),canvas=document.createElement('canvas');
@@ -27,7 +46,7 @@ async function closePDF(){if(cached){const old=cached;cached=null;await old.task
 export function releasePDF(){return serialize(closePDF)}
 export function renderPDFRegion(source,pageNumber,plan,canvas,signal){return serialize(async()=>{
  if(signal?.aborted)return false;
- if(cached?.source!==source){await closePDF();if(signal?.aborted)return false;const opened=openPDF(Uint8Array.from(atob(source),c=>c.charCodeAt(0)));cached={source,...opened,pages:new Map()}}
+ if(cached?.source!==source){await closePDF();if(signal?.aborted)return false;const opened=await openPDF(Uint8Array.from(atob(source),c=>c.charCodeAt(0)));cached={source,...opened,pages:new Map()}}
  let page,renderTask;
  try{
   const pdf=await cached.document;if(signal?.aborted)return false;page=cached.pages.get(pageNumber)||await pdf.getPage(pageNumber);cached.pages.delete(pageNumber);cached.pages.set(pageNumber,page);while(cached.pages.size>2){const [number,old]=cached.pages.entries().next().value;cached.pages.delete(number);old.cleanup()}if(signal?.aborted)return false;
