@@ -1,6 +1,6 @@
 export function axisPoint(start,point){return Math.abs(point[0]-start[0])>=Math.abs(point[1]-start[1])?[point[0],start[1]]:[start[0],point[1]]}
 export function polygonPoints(e){return (e.corners||(e.type==='triangle'?[[.5,0],[1,1],[0,1]]:[[0,0],[1,0],[1,1],[0,1]])).map(([x,y])=>[e.x+x*e.w,e.y+y*e.h])}
-export function polygonBounds(points){const x=Math.min(...points.map(p=>p[0])),y=Math.min(...points.map(p=>p[1])),w=Math.max(.01,Math.max(...points.map(p=>p[0]))-x),h=Math.max(.01,Math.max(...points.map(p=>p[1]))-y);return {x,y,w,h,corners:points.map(([px,py])=>[(px-x)/w,(py-y)/h])}}
+export function polygonBounds(points,padding=0){const x=Math.min(...points.map(p=>p[0]))-padding,y=Math.min(...points.map(p=>p[1]))-padding,w=Math.max(.01,Math.max(...points.map(p=>p[0]))-x+padding),h=Math.max(.01,Math.max(...points.map(p=>p[1]))-y+padding);return {x,y,w,h,corners:points.map(([px,py])=>[(px-x)/w,(py-y)/h])}}
 export function squareBeforeDrag(points){if(points.length!==4)return false;const edges=points.map((a,i)=>{const b=points[(i+1)%4];return [b[0]-a[0],b[1]-a[1]]}),lengths=edges.map(p=>Math.hypot(...p)),size=Math.max(...lengths);return size>0&&lengths.every(n=>Math.abs(n-size)<=Math.max(.01,size*.001))&&edges.every((a,i)=>Math.abs(a[0]*edges[(i+1)%4][0]+a[1]*edges[(i+1)%4][1])<=size*size*.001)}
 export function deformPolygon(points,index,raw,{ctrl=false,shift=false,square=squareBeforeDrag(points)}={}){
  const start=points[index],point=shift&&!ctrl?axisPoint(start,raw):raw;
