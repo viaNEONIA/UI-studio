@@ -18,7 +18,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --grep "PDF parsing|buffered pans"
+      - run: npm run test:e2e
       - name: Reproduce original v0.6 regressions
         run: BASELINE=1 npm run test:e2e -- --grep "group at edge|invalid import|export escapes"
       - name: Package release assets
