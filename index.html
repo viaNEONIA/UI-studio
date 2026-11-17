@@ -239,26 +239,45 @@ function validatePDFReference(meta,sources) {
 function makeBackground(sc){if(!sc.background||!sc.background.visible)return null;const b=sc.background,img=document.createElement('img');img.className='document-background';img.alt='';img.src=b.src;img.draggable=false;img.style.cssText=`position:absolute;left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;opacity:${b.opacity};object-fit:contain;pointer-events:${b.locked?'none':'auto'};cursor:${b.locked?'default':'move'};user-select:none;`;if(!b.locked&&!viewOnly)img.addEventListener('pointerdown',ev=>{if(ev.button!==0)return;ev.preventDefault();ev.stopPropagation();const start={x:b.x,y:b.y,cx:ev.clientX,cy:ev.clientY,z:Number($('zoom').value)};let changed=false;img.setPointerCapture(ev.pointerId);const move=event=>{const dx=(event.clientX-start.cx)/start.z,dy=(event.clientY-start.cy)/start.z;if(!changed&&(dx||dy)){snapshot();changed=true}b.x=start.x+dx;b.y=start.y+dy;img.style.left=b.x+'px';img.style.top=b.y+'px';schedulePDFBackground()};const end=()=>{img.removeEventListener('pointermove',move);img.removeEventListener('pointerup',end);img.removeEventListener('pointercancel',end);render()};img.addEventListener('pointermove',move);img.addEventListener('pointerup',end);img.addEventListener('pointercancel',end)});return img}
 function backgroundHTML(sc){if(!sc.background||!sc.background.visible)return '';const b=sc.background;return `<img alt="" class="document-background" src="${esc(b.src)}" style="position:absolute;pointer-events:none;left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;opacity:${b.opacity};object-fit:contain">`}
 function fitBackground(b){const img=new Image();img.onload=()=>{snapshot();const scale=Math.min(project.width/img.naturalWidth,project.height/img.naturalHeight);b.w=img.naturalWidth*scale;b.h=img.naturalHeight*scale;b.x=(project.width-b.w)/2;b.y=(project.height-b.h)/2;render()};img.onerror=()=>tell('背景画像を読み込めませんでした');img.src=b.src}
-let pdfPreviewTimer=null,pdfPreviewController=null,pdfRuntimeActive=false,pdfPreviewGeneration=0;
+let pdfPreviewTimer=null,pdfPreviewController=null,pdfPreviewPending=null,pdfPreviewCache=null,pdfRuntimeActive=false,pdfPreviewGeneration=0;
 function prunePDFSources(p){if(!p.pdfSources)return;const used=new Set(p.screens.map(sc=>sc.background?.pdf?.sourceId).filter(Boolean));for(const id of Object.keys(p.pdfSources))if(!used.has(id))delete p.pdfSources[id];if(!Object.keys(p.pdfSources).length)delete p.pdfSources}
-function cancelPDFPreview(){clearTimeout(pdfPreviewTimer);pdfPreviewController?.abort();pdfPreviewController=null;pdfPreviewGeneration++}
+function cancelPDFPreview(){clearTimeout(pdfPreviewTimer);pdfPreviewController?.abort();pdfPreviewController=null;pdfPreviewPending=null;pdfPreviewGeneration++}
+function pdfPreviewContext(b){return {key:JSON.stringify([b.pdf.sourceId,b.pdf.pageNumber,b.pdf.pageWidth,b.pdf.pageHeight,b.x,b.y,b.w,b.h]),source:project.pdfSources?.[b.pdf.sourceId],sourceId:b.pdf.sourceId}}
+function showPDFPreview(entry,b,img){
+ const plan=entry.plan,canvas=entry.canvas;for(const old of $('device').querySelectorAll('.pdf-background-render'))if(old!==canvas)old.remove();
+ canvas.style.cssText=`position:absolute;left:${plan.left}px;top:${plan.top}px;width:${plan.width}px;height:${plan.height}px;opacity:${b.opacity};pointer-events:none;z-index:0`;img.after(canvas);
+ canvas.dataset.pixelRatio=String(plan.pixelRatio);canvas.dataset.pageNumber=String(b.pdf.pageNumber);
+ // Punch out only the sharp tile: retain the preview outside it while panning.
+ img.style.maskImage='linear-gradient(#000,#000),linear-gradient(#000,#000)';img.style.maskSize=`100% 100%, ${plan.width}px ${plan.height}px`;img.style.maskPosition=`0 0, ${plan.left-b.x}px ${plan.top-b.y}px`;img.style.maskRepeat='no-repeat';img.style.maskComposite='exclude';
+ const whole=window.MeetingTools.planPDFRegion(b.pdf,b,{x:b.x,y:b.y,width:b.w,height:b.h},plan.pixelRatio);
+ if(window.MeetingTools.containsPDFRegion(plan,whole,0))img.style.maskImage='linear-gradient(transparent,transparent)';
+}
 function schedulePDFBackground(){
- cancelPDFPreview();const generation=pdfPreviewGeneration,b=screen().background,img=$('device').querySelector('img.document-background'),status=$('pdfQualityStatus');
- const old=$('device').querySelector('.pdf-background-render');if(old){old.remove();old.width=old.height=0}if(img)img.style.maskImage='';
- if(!b?.visible||!b.pdf||!img){status.textContent=b?(b.pdf?'PDF：背景を非表示':'画像背景'):'';if(pdfRuntimeActive){window.MeetingTools?.releasePDF?.();pdfRuntimeActive=false}return}
- if(!window.MeetingTools?.renderPDFRegion){status.textContent='PDF再描画にはビルド済みの配布版を使用してください。現在はプレビューを表示しています';return}
- status.textContent='PDF：表示倍率に合わせて再描画中…';const source=project.pdfSources?.[b.pdf.sourceId],controller=new AbortController();pdfPreviewController=controller;
+ const b=screen().background,img=$('device').querySelector('img.document-background'),status=$('pdfQualityStatus'),tools=window.MeetingTools;
+ if(tools?.PDFPreviewCache){pdfPreviewCache??=new tools.PDFPreviewCache();pdfPreviewCache.retain(e=>project.pdfSources?.[e.sourceId]===e.source)}
+ if(!b?.visible||!b.pdf||!img){cancelPDFPreview();status.textContent=b?(b.pdf?'PDF：背景を非表示':'画像背景'):'';if(pdfRuntimeActive){tools?.releasePDF?.();pdfRuntimeActive=false}return}
+ if(!tools?.renderPDFRegion){status.textContent='PDF再描画にはビルド済みの配布版を使用してください。現在はプレビューを表示しています';return}
+ const context=pdfPreviewContext(b),d=$('device').getBoundingClientRect(),w=$('workspace').getBoundingClientRect(),z=Number($('zoom').value),workspace=$('workspace');
+ const bounds={x:(w.left+workspace.clientLeft-d.left)/z-2,y:(w.top+workspace.clientTop-d.top)/z-2,width:workspace.clientWidth/z,height:workspace.clientHeight/z},plans=tools.planPDFPreview(b.pdf,b,bounds,z*(window.devicePixelRatio||1),z);
+ const compatible=pdfPreviewCache.compatible(context),ready=plans&&compatible.find(e=>tools.containsPDFRegion(e.plan,plans.visible)),fallback=ready||compatible[0];
+ for(const old of $('device').querySelectorAll('.pdf-background-render'))if(old!==fallback?.canvas)old.remove();
+ for(const prop of ['mask-image','mask-size','mask-position','mask-repeat','mask-composite'])img.style.removeProperty(prop);
+ if(fallback){pdfPreviewCache.touch(fallback);showPDFPreview(fallback,b,img)}
+ if(!plans){cancelPDFPreview();status.textContent='PDF：表示範囲外';return}
+ if(ready){cancelPDFPreview();status.textContent=ready.plan.limited?'PDF：再描画済み（表示領域の画素数上限に合わせて調整）':'PDF：表示倍率に合わせて再描画済み';return}
+ if(pdfPreviewPending?.key===context.key&&pdfPreviewPending.source===context.source&&tools.containsPDFRegion(pdfPreviewPending.plan,plans.visible))return;
+ cancelPDFPreview();const generation=pdfPreviewGeneration,controller=new AbortController(),plan=plans.render;pdfPreviewController=controller;
+ pdfPreviewPending={...context,plan};status.textContent='PDF：表示倍率に合わせて再描画中…';
  pdfPreviewTimer=setTimeout(async()=>{
-  let canvas;try{
-   const d=$('device').getBoundingClientRect(),w=$('workspace').getBoundingClientRect(),z=Number($('zoom').value),workspace=$('workspace');
-   const bounds={x:(w.left+workspace.clientLeft-d.left)/z-2,y:(w.top+workspace.clientTop-d.top)/z-2,width:workspace.clientWidth/z,height:workspace.clientHeight/z};
-   const plan=window.MeetingTools.planPDFRegion(b.pdf,b,bounds,z*(window.devicePixelRatio||1));if(!plan){status.textContent='PDF：表示範囲外';return}
-   canvas=document.createElement('canvas');canvas.className='pdf-background-render';canvas.setAttribute('aria-hidden','true');canvas.style.cssText=`position:absolute;left:${plan.left}px;top:${plan.top}px;width:${plan.width}px;height:${plan.height}px;opacity:${b.opacity};pointer-events:none;z-index:0`;
-   pdfRuntimeActive=true;const painted=await window.MeetingTools.renderPDFRegion(source,b.pdf.pageNumber,plan,canvas,controller.signal);
-   if(!painted||generation!==pdfPreviewGeneration||!img.isConnected){canvas.width=canvas.height=0;return}
-   $('device').querySelector('.pdf-background-render')?.remove();img.after(canvas);img.style.maskImage='linear-gradient(transparent,transparent)';canvas.dataset.pixelRatio=String(plan.pixelRatio);canvas.dataset.pageNumber=String(b.pdf.pageNumber);status.textContent=plan.limited?'PDF：再描画済み（表示領域の画素数上限に合わせて調整）':'PDF：表示倍率に合わせて再描画済み';
-  }catch(error){if(canvas)canvas.width=canvas.height=0;if(!controller.signal.aborted&&generation===pdfPreviewGeneration)status.textContent='PDFを再描画できませんでした。プレビューを表示しています: '+error.message}
- },100);
+  const canvas=document.createElement('canvas');canvas.className='pdf-background-render';canvas.setAttribute('aria-hidden','true');
+  try{
+   pdfRuntimeActive=true;const painted=await tools.renderPDFRegion(context.source,b.pdf.pageNumber,plan,canvas,controller.signal);
+   const current=screen().background,currentImage=$('device').querySelector('img.document-background');
+   if(!painted||generation!==pdfPreviewGeneration||!current?.visible||!current.pdf||!currentImage||pdfPreviewContext(current).key!==context.key||pdfPreviewContext(current).source!==context.source){canvas.width=canvas.height=0;return}
+   pdfPreviewPending=null;pdfPreviewController=null;pdfPreviewCache.put({...context,plan,canvas});showPDFPreview({plan,canvas},current,currentImage);
+   status.textContent=plan.limited?'PDF：再描画済み（表示領域の画素数上限に合わせて調整）':'PDF：表示倍率に合わせて再描画済み';
+  }catch(error){canvas.width=canvas.height=0;if(!controller.signal.aborted&&generation===pdfPreviewGeneration){pdfPreviewPending=null;pdfPreviewController=null;status.textContent='PDFを再描画できませんでした。プレビューを表示しています: '+error.message}}
+ },180);
 }
 $('workspace').addEventListener('scroll',schedulePDFBackground,{passive:true});window.addEventListener('resize',schedulePDFBackground);
 function renderMeeting(){const sc=screen(),b=sc.background;for(const id of ['bgVisible','bgLocked','bgOpacity','bgFit','bgRemove'])$(id).disabled=!b||meetingBusy;$('bgVisible').checked=b?b.visible:true;$('bgLocked').checked=b?b.locked:true;$('bgOpacity').value=b?b.opacity*100:100;$('bgName').textContent=b?b.name:'背景なし';for(const id of ['exportPng','exportPdf','exportPptx']){$(id).disabled=meetingBusy||!window.MeetingTools;$(id).title=window.MeetingTools?'':'PNG・PDF・PPTX出力にはビルド済みの配布版を使用してください'}const root=$('layers');if(b){const row=document.createElement('div');row.className='layer-row background-row';const name=document.createElement('button');name.className='layer background-layer-nav';name.textContent='▧ 背景資料専用: '+b.name;name.title='背景資料の位置へ移動';name.onclick=()=>navigateLayer(b,true);const lock=document.createElement('button');lock.textContent=b.locked?'🔒':'🔓';lock.className='layer-lock';lock.setAttribute('aria-label',b.locked?'背景資料のロックを解除':'背景資料をロック');lock.disabled=viewOnly;lock.setAttribute('aria-pressed',String(b.locked));lock.onclick=()=>{snapshot();b.locked=!b.locked;render()};const remove=document.createElement('button');remove.textContent='×';remove.setAttribute('aria-label','背景資料を削除');remove.disabled=viewOnly;remove.onclick=()=>$('bgRemove').click();row.append(name,lock,remove);row.title='背景資料専用。通常の部品とは別に常に最背面に配置します';root.append(row)}$('pageCount').textContent=(project.screens.indexOf(sc)+1)+' / '+project.screens.length;$('previousPage').disabled=project.screens.indexOf(sc)===0;$('nextPage').disabled=project.screens.indexOf(sc)===project.screens.length-1;prunePDFSources(project);schedulePDFBackground();queueBackup()}

@@ -1,8 +1,10 @@
 import * as pdfjs from 'pdfjs-dist/build/pdf.mjs';
-import * as worker from 'pdfjs-dist/build/pdf.worker.mjs';
+import workerSource from 'pdf-worker-code';
 import assets from 'pdf-assets';
 export {planPDFRegion} from './pdf-render-plan.mjs';
-globalThis.pdfjsWorker=worker;
+// A Blob module keeps parsing off the UI thread, including standalone file:// use.
+// PDF.js can import the same embedded module as a fake-worker fallback if needed.
+pdfjs.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([workerSource],{type:'text/javascript'}));
 class EmbeddedBinaryData { async fetch({kind,filename}) { const encoded=assets[kind+'/'+filename];if(!encoded)throw Error('PDFリソースが見つかりません: '+filename);return Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)); } }
 function openPDF(data){const task=pdfjs.getDocument({data,isEvalSupported:false,useWorkerFetch:false,BinaryDataFactory:EmbeddedBinaryData,cMapPacked:true,useWasm:true});let passwordReject;const passwordError=new Promise((_,reject)=>passwordReject=reject);task.onPassword=()=>passwordReject(Error('パスワード付きPDFには対応していません'));return {task,document:Promise.race([task.promise,passwordError])}}
 function encode(bytes){const pieces=[];for(let i=0;i<bytes.length;i+=32768)pieces.push(String.fromCharCode(...bytes.subarray(i,i+32768)));return btoa(pieces.join(''))}
@@ -17,22 +19,22 @@ export async function readPDF(file,onProgress){
  return {pages,source};
  }finally{await opened.task.destroy()}
 }
-// One decoded PDF and one render at a time. Do not store rendered tiles in the project.
+// One decoded PDF and one render at a time. Keep at most two page operator lists.
+// Rendered preview tiles are owned separately by the bounded viewport cache.
 let cached=null,queue=Promise.resolve();
 function serialize(fn){const next=queue.then(fn,fn);queue=next.catch(()=>{});return next}
 async function closePDF(){if(cached){const old=cached;cached=null;await old.task.destroy()}}
 export function releasePDF(){return serialize(closePDF)}
 export function renderPDFRegion(source,pageNumber,plan,canvas,signal){return serialize(async()=>{
  if(signal?.aborted)return false;
- if(cached?.source!==source){await closePDF();if(signal?.aborted)return false;const opened=openPDF(Uint8Array.from(atob(source),c=>c.charCodeAt(0)));cached={source,...opened}}
+ if(cached?.source!==source){await closePDF();if(signal?.aborted)return false;const opened=openPDF(Uint8Array.from(atob(source),c=>c.charCodeAt(0)));cached={source,...opened,pages:new Map()}}
  let page,renderTask;
  try{
-  const pdf=await cached.document;if(signal?.aborted)return false;page=await pdf.getPage(pageNumber);if(signal?.aborted)return false;
+  const pdf=await cached.document;if(signal?.aborted)return false;page=cached.pages.get(pageNumber)||await pdf.getPage(pageNumber);cached.pages.delete(pageNumber);cached.pages.set(pageNumber,page);while(cached.pages.size>2){const [number,old]=cached.pages.entries().next().value;cached.pages.delete(number);old.cleanup()}if(signal?.aborted)return false;
   canvas.width=plan.pixelWidth;canvas.height=plan.pixelHeight;
   renderTask=page.render({canvasContext:canvas.getContext('2d'),viewport:page.getViewport({scale:plan.scale}),transform:[1,0,0,1,-plan.cropX*plan.pixelRatio,-plan.cropY*plan.pixelRatio]});
-  const cancel=()=>renderTask.cancel();signal?.addEventListener('abort',cancel,{once:true});
-  try{await renderTask.promise}finally{signal?.removeEventListener('abort',cancel)}
+  let continuation;const cancel=()=>{clearTimeout(continuation);renderTask.cancel()};if(signal)renderTask.onContinue=resume=>{continuation=setTimeout(()=>{if(signal.aborted)renderTask.cancel();else resume()},0)};signal?.addEventListener('abort',cancel,{once:true});
+  try{await renderTask.promise}finally{clearTimeout(continuation);signal?.removeEventListener('abort',cancel)}
   if(signal?.aborted){canvas.width=canvas.height=0;return false}return true;
  }catch(error){canvas.width=canvas.height=0;if(signal?.aborted)return false;await closePDF();throw error}
- finally{page?.cleanup()}
 })}
