@@ -1,4 +1,4 @@
-import {confirmTwoPointDraft} from './editor-panels.mjs';
+import {confirmTwoPointDraft,placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import { test, expect } from '@playwright/test';
@@ -11,7 +11,7 @@ async function saved(page) {return JSON.parse(await download(page,'#saveJson'));
 async function move(page, locator, dx, dy) {const r=await locator.boundingBox();await page.mouse.move(r.x+5,r.y+5);await page.mouse.down();await page.mouse.move(r.x+5+dx*.65,r.y+5+dy*.65,{steps:5});await page.mouse.up();}
 test.beforeEach(async ({page}, testInfo) => {if(process.env.BASELINE && /group at edge|invalid import|export escapes/.test(testInfo.title))test.fail(true,'Original v0.6 regression reproduction');await page.goto('/');await expandEditorPanels(page);});
 test('all components add; undo, redo, delete',async({page})=>{
-  const buttons=page.locator('#components button'),count=await buttons.count();for(let i=0;i<await buttons.count();i++){await buttons.nth(i).click();await placePendingObject(page)}
+  const buttons=page.locator('#components button'),count=await buttons.count();for(let i=0;i<await buttons.count();i++){await buttons.nth(i).click();await placePendingObject(page);await placeDefaultLine(page)}
   await expect(page.locator('.element')).toHaveCount(count);
   await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(count-1);
   await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(count);

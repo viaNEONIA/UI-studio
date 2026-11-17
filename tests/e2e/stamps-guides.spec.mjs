@@ -1,10 +1,11 @@
+import {createCanvas} from '@napi-rs/canvas';
 import {confirmTwoPointDraft,placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
-const image=name=>({name,mimeType:'image/png',buffer:png});
+const image=name=>{if(name!=='plan.png')return {name,mimeType:'image/png',buffer:png};const canvas=createCanvas(500,700),ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,500,700);return {name,mimeType:'image/png',buffer:canvas.toBuffer('image/png')}};
 async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function load(page,p){await page.locator('#file').setInputFiles({name:'project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))})}
 async function guide(page,axis,pos){await page.locator('#guideAxis').selectOption(axis);await page.locator('#guidePosition').fill(String(pos));await page.locator('#addGuide').click()}
