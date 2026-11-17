@@ -57,6 +57,6 @@ ZIPはJSZipを単独HTMLに同梱し、ノートJSONとプロパティ設定を�
 
 `exportVectorPDF` / `composeVectorPDF` の `mode` は `normal`（既定）または `editable`。DOMで測定した文字・パスは共通で、通常時は本文へ、編集用では要素別のAppearance Streamへ描く。`pdf-editable.mjs` が標準注釈辞書のContents、L、Vertices、InkList、色、線幅、透明度、端点記号を設定する。注釈はPrintフラグのみでロックしない。回転・背景の切り抜き・用紙換算を本文と同じ変換で処理する。共有フォント／画像を再利用し、編集用でも図形や文字全体を画像化しない。
 
-表示文字とコメントは別の意味を持つためFreeTextのContentsには表示文字を入れ、任意の `pdfComment` はText返信（IRT、RT=R、NoViewフラグで不要なアイコンを非表示）へ格納する。図形のコメントはその図形注釈のContentsとする。図形中の表示文字は別FreeTextとなる。コメントの変更は通常の履歴とJSONへ保存し、旧データは省略可能。未対応部品は本文への通常合成数をステータスに示す。
+表示文字とコメントは別の意味を持つためFreeTextのContentsには表示文字を入れ、任意の `pdfComment` はText返信（IRT、RT=R、空のAppearanceで不要なアイコンを描かず、編集を妨げる非表示フラグは使わない）へ格納する。図形のコメントはその図形注釈のContentsとする。図形中の表示文字は別FreeTextとなる。コメントの変更は通常の履歴とJSONへ保存し、旧データは省略可能。未対応部品は本文への通常合成数をステータスに示す。
 
 ペン確定時は `polygonBounds(points,padding)` で線幅に応じた余白を確保し、正規化した点の実座標を維持する。旧データの極小SVGは最小1pxのviewportを用い、水平・垂直のSVG描画面が消えることを防ぐ。

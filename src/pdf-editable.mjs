@@ -32,6 +32,6 @@ export function addEditableAnnotation({doc,page,original:e,prepared,transform,re
   const color=prepared.textRuns?.[0]?.color||[0,0,0],fontSize=(e.font||16)*transform.scale,da='/KaigiNote '+fontSize+' Tf '+color.slice(0,3).map(v=>v/255).join(' ')+' rg';dict.set(N('DA'),PDFString.of(da));dict.set(N('Q'),context.obj({left:0,center:1,right:2}[e.textAlign||'left']));dict.set(N('BS'),context.obj({W:0,S:'S'}));dict.set(N('Border'),context.obj([0,0,0]));dict.set(N('Rotate'),context.obj((360-(page.getRotation().angle||0))%360));if(font){dict.set(N('DR'),context.obj({Font:{KaigiNote:font.ref}}));page.node.setFontDictionary(N('KaigiNote'),font.ref)}
  }
  const ref=context.register(dict);page.node.addAnnot(ref);
- if(subtype==='FreeText'&&e.pdfComment){const reply=context.obj({Type:'Annot',Subtype:'Text',P:page.ref,Rect:[rect[0],rect[1],rect[0]+16,rect[1]+16],F:32,IRT:ref,RT:'R',T:PDFHexString.fromText('会議ノート'),Contents:PDFHexString.fromText(e.pdfComment),NM:PDFString.of('kaigi-'+index+'-comment'),Open:false});page.node.addAnnot(context.register(reply))}
+ if(subtype==='FreeText'&&e.pdfComment){const empty=context.register(context.flateStream(new Uint8Array(),{Type:'XObject',Subtype:'Form',BBox:[0,0,16,16],Resources:{}})),reply=context.obj({Type:'Annot',Subtype:'Text',P:page.ref,Rect:[rect[0],rect[1],rect[0]+16,rect[1]+16],F:4,AP:{N:empty},IRT:ref,RT:'R',T:PDFHexString.fromText('会議ノート'),Contents:PDFHexString.fromText(e.pdfComment),NM:PDFString.of('kaigi-'+index+'-comment'),Open:false});page.node.addAnnot(context.register(reply))}
  return ref;
 }
