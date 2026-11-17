@@ -244,7 +244,7 @@ function prunePDFSources(p){if(!p.pdfSources)return;const used=new Set(p.screens
 function cancelPDFPreview(){clearTimeout(pdfPreviewTimer);pdfPreviewController?.abort();pdfPreviewController=null;pdfPreviewPending=null;pdfPreviewGeneration++}
 function pdfPreviewContext(b){return {key:JSON.stringify([b.pdf.sourceId,b.pdf.pageNumber,b.pdf.pageWidth,b.pdf.pageHeight,b.x,b.y,b.w,b.h]),source:project.pdfSources?.[b.pdf.sourceId],sourceId:b.pdf.sourceId}}
 function showPDFPreview(entry,b,img){
- const plan=entry.plan,canvas=entry.canvas;for(const old of $('device').querySelectorAll('.pdf-background-render'))if(old!==canvas)old.remove();
+ const plan=entry.plan,canvas=entry.canvas;if(canvas.previousElementSibling===img&&canvas.style.opacity===String(b.opacity)&&img.style.maskImage)return;for(const old of $('device').querySelectorAll('.pdf-background-render'))if(old!==canvas)old.remove();
  canvas.style.cssText=`position:absolute;left:${plan.left}px;top:${plan.top}px;width:${plan.width}px;height:${plan.height}px;opacity:${b.opacity};pointer-events:none;z-index:0`;img.after(canvas);
  canvas.dataset.pixelRatio=String(plan.pixelRatio);canvas.dataset.pageNumber=String(b.pdf.pageNumber);
  // Punch out only the sharp tile: retain the preview outside it while panning.
@@ -261,7 +261,7 @@ function schedulePDFBackground(){
  const bounds={x:(w.left+workspace.clientLeft-d.left)/z-2,y:(w.top+workspace.clientTop-d.top)/z-2,width:workspace.clientWidth/z,height:workspace.clientHeight/z},plans=tools.planPDFPreview(b.pdf,b,bounds,z*(window.devicePixelRatio||1),z);
  const compatible=pdfPreviewCache.compatible(context),ready=plans&&compatible.find(e=>tools.containsPDFRegion(e.plan,plans.visible)),fallback=ready||compatible[0];
  for(const old of $('device').querySelectorAll('.pdf-background-render'))if(old!==fallback?.canvas)old.remove();
- for(const prop of ['mask-image','mask-size','mask-position','mask-repeat','mask-composite'])img.style.removeProperty(prop);
+ if(!fallback)for(const prop of ['mask-image','mask-size','mask-position','mask-repeat','mask-composite'])img.style.removeProperty(prop);
  if(fallback){pdfPreviewCache.touch(fallback);showPDFPreview(fallback,b,img)}
  if(!plans){cancelPDFPreview();status.textContent='PDF：表示範囲外';return}
  if(ready){cancelPDFPreview();status.textContent=ready.plan.limited?'PDF：再描画済み（表示領域の画素数上限に合わせて調整）':'PDF：表示倍率に合わせて再描画済み';return}
