@@ -37,3 +37,13 @@ test('layout, manual save, ZIP backup/restore and runtime new-note cancellation 
  await page.locator('#file').setInputFiles({name:'backup.zip',mimeType:'application/zip',buffer:await zip.generateAsync({type:'nodebuffer'})});await expect(page.locator('.element')).toHaveCount(1);expect(await save(page)).toEqual(before);
  await page.evaluate(()=>window.showSaveFilePicker=undefined);const saved=page.waitForEvent('download');await page.keyboard.press('Control+s');expect(JSON.parse(await readFile(await(await saved).path(),'utf8'))).toEqual(before);await page.screenshot({path:info.outputPath('workflow-layout.png')});
 });
+
+test('manual save reuses the chosen file, and cancelling the picker leaves the note untouched',async({page})=>{
+ await place(page,'quickBox');const before=await save(page);
+ await page.evaluate(()=>{window.savedNotes=[];window.pickerCalls=0;window.showSaveFilePicker=async()=>{window.pickerCalls++;return {async createWritable(){return {async write(data){window.savedNotes.push(JSON.parse(data))},async close(){},async abort(){}}}}}});
+ await page.locator('#manualSave').click();await expect(page.locator('#meetingStatus')).toContainText('手動保存');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>window.savedNotes.length)).toBe(2);expect(await page.evaluate(()=>window.pickerCalls)).toBe(1);expect(await page.evaluate(()=>window.savedNotes[0])).toEqual(before);
+ await page.locator('#newNote').click();await page.locator('#startupBegin').click();await page.evaluate(()=>window.showSaveFilePicker=async()=>{throw new DOMException('cancelled','AbortError')});const blank=await save(page);await page.locator('#manualSave').click();expect(await save(page)).toEqual(blank);
+});
+test('standalone file supports ZIP backup and restored text fitting without network access',async({page},info)=>{
+ const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);const requests=[];page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url())});await place(page,'quickText');const before=await save(page),wait=page.waitForEvent('download');await page.locator('#backupZip').click();const bytes=await readFile(await(await wait).path());await page.locator('#newNote').click();await page.locator('#startupBegin').click();await page.locator('#file').setInputFiles({name:'offline.zip',mimeType:'application/zip',buffer:bytes});await expect(page.locator('.element')).toHaveCount(1);expect(await save(page)).toEqual(before);expect(requests).toEqual([]);await page.screenshot({path:info.outputPath('workflow-offline.png')});
+});
