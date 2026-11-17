@@ -2,15 +2,15 @@ import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {jsPDF} from 'jspdf';
 import JSZip from 'jszip';
-import {expandEditorPanels} from './editor-panels.mjs';
+import {expandEditorPanels,placePendingObject} from './editor-panels.mjs';
 async function save(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function point(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());return {x:r.x+(x+2)*z,y:r.y+(y+2)*z}}
 async function click(page,x,y){const p=await point(page,x,y);await page.mouse.click(p.x,p.y)}
 async function move(page,x,y){const p=await point(page,x,y);await page.mouse.move(p.x,p.y)}
-async function place(page,id,x=170,y=200){await page.locator('#'+id).click();await click(page,x,y);await page.keyboard.press('Enter')}
+async function place(page,id,x=170,y=200){await page.locator('#'+id).click();await placePendingObject(page,{x,y})}
 test.beforeEach(async({page})=>{const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');expect(errors).toEqual([]);await expandEditorPanels(page)});
 test('all object drafts freeze on click and require Enter; Backspace steps back; Escape selects',async({page})=>{
- await page.locator('#quickBox').click();await expect(page.locator('#quickBox')).toHaveAttribute('aria-pressed','true');await click(page,150,200);await move(page,250,300);expect((await save(page)).screens[0].elements).toHaveLength(0);await page.keyboard.press('Enter');let e=(await save(page)).screens[0].elements[0];expect(e.x+e.w/2).toBeCloseTo(150);expect(e.y+e.h/2).toBeCloseTo(200);
+ await page.locator('#quickBox').click();await expect(page.locator('#quickBox')).toHaveAttribute('aria-pressed','true');await click(page,150,200);await click(page,250,300);await move(page,350,400);expect((await save(page)).screens[0].elements).toHaveLength(0);await page.keyboard.press('Enter');let e=(await save(page)).screens[0].elements[0];expect(e.x+e.w/2).toBeCloseTo(200);expect(e.y+e.h/2).toBeCloseTo(250);
  await page.locator('#quickLine').click();await click(page,80,120);await click(page,240,250);expect((await save(page)).screens[0].elements).toHaveLength(1);await page.keyboard.press('Backspace');await expect(page.locator('.drawing-preview circle')).toHaveCount(1);await click(page,260,290);await page.keyboard.press('Enter');expect((await save(page)).screens[0].elements).toHaveLength(2);await page.keyboard.press('Escape');await expect(page.locator('#quickSelect')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#quickLine')).toHaveAttribute('aria-pressed','false');await page.keyboard.press('Backspace');expect((await save(page)).screens[0].elements).toHaveLength(1);
  await page.locator('#handTool').click();await page.keyboard.press('Escape');await expect(page.locator('#handTool')).toHaveAttribute('aria-pressed','false');
 });

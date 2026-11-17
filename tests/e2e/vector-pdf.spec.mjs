@@ -26,9 +26,10 @@ test('bitmap background remains an image while annotations stay vector, and UI c
 test('HTML, additional CSS and unsupported glyphs fail clearly without downloading or changing the project',async({page})=>{
  test.setTimeout(120000);let count=0;page.on('download',()=>count++);for(const [e,message]of [[item('html','html',0,0,100,100,'<p>x</p>'),'HTML部品'],[item('css','box',0,0,100,100,'',{css:'transform:rotate(20deg)'}),'追加CSS'],[item('emoji','text',0,0,200,100,'😀'),'フォント']]){await load(page,project([e]));await page.locator('#exportPdf').click();await expect(page.locator('#meetingStatus')).toContainText(message,{timeout:60000})}expect(count).toBe(0);
 });
-test('source PDF annotations stop export instead of silently disappearing',async({page})=>{
- await importPDF(page,await source(0,true));let count=0;page.on('download',()=>count++);await page.locator('#exportPdf').click();await expect(page.locator('#meetingStatus')).toContainText('欠落を防ぐ');expect(count).toBe(0);
+test('source PDF annotations are retained and no longer stop export',async({page})=>{
+ await importPDF(page,await source(0,true));const bytes=await download(page),output=await PDFDocument.load(bytes);expect(output.getPage(0).node.Annots().size()).toBe(1);await expect(page.locator('#meetingStatus')).toContainText('注釈・リンク1件保持');
 });
+
 test('standalone file exports Japanese vector text offline',async({page})=>{
  test.setTimeout(120000);const{pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);const requests=[];page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url())});await load(page,project([item('note','text',30,50,400,100,'オフライン会議資料')]));const result=await inspect(await download(page));expect(result.text).toContain('オフライン会議資料');expect(result.images).toBe(0);expect(requests).toEqual([]);
 });

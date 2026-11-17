@@ -7,7 +7,7 @@ export async function flattenSourceForms(input,pages,{fontBytes,fontkit}={}){
  if(acro){try{if(acro.has(name('XFA')))throw Error('XFA');const form=input.getForm(),all=form.getFields();fields=all.length;
    const needs=acro.lookupMaybe(name('NeedAppearances'))?.toString()==='true';if(needs)all.forEach(field=>form.markFieldAsDirty(field.ref));
    if(all.some(field=>field.needsAppearancesUpdate())){let font;if(fontBytes){input.registerFontkit(fontkit);font=await input.embedFont(await fontBytes(),{subset:true})}form.updateFieldAppearances(font)}
-   form.flatten({updateFieldAppearances:false});
+   form.flatten({updateFieldAppearances:false});await input.flush();
   }catch{fallback=new Set(widgetPages)}
  }
  pages.forEach((page,i)=>{const annots=page.node.Annots();if(annots)for(let j=annots.size()-1;j>=0;j--)if(!(input.context.lookup(annots.get(j)) instanceof PDFDict))annots.remove(j);if(pageAnnotations(page).some(a=>subtype(a.dict)==='Widget'))fallback.add(i)});
@@ -33,8 +33,8 @@ function remapDestination(input,value,sourceId,targets){
 }
 // Annotation geometry remains in the source's native coordinates. The output page
 // retains /Rotate, while the drawing content receives its inverse transform.
-export function preserveAnnotations({input,items,sourceId,crop,page},targets){
- const copier=PDFObjectCopier.for(input.context,page.doc.context),context=page.doc.context,pairs=[],refs=new Map();let omittedLinks=0;
+export function preserveAnnotations({input,items,sourceId,crop,page,annotationCopier},targets){
+ const copier=annotationCopier||PDFObjectCopier.for(input.context,page.doc.context),context=page.doc.context,pairs=[],refs=new Map();let omittedLinks=0;
  for(const {ref,dict}of items){const copied=PDFDict.withContext(context);
   for(const [key,value]of dict.entries()){const k=key.decodeText();if(['P','Parent','Popup','IRT','Dest','A','AA','StructParent'].includes(k))continue;
    if(['Rect','QuadPoints','Vertices','L','CL'].includes(k)&&input.context.lookup(value) instanceof PDFArray){const shifted=shiftedArray(context,input.context.lookup(value,PDFArray),crop.x,crop.y);if(shifted)copied.set(key,shifted);continue}
@@ -44,7 +44,7 @@ export function preserveAnnotations({input,items,sourceId,crop,page},targets){
   copied.set(name('P'),page.ref);
   const dest=dict.get(name('Dest')),action=dict.lookupMaybe(name('A'),PDFDict);
   if(dest){const mapped=remapDestination(input,dest,sourceId,targets);if(mapped)copied.set(name('Dest'),mapped);else omittedLinks++}
-  if(action){const type=action.lookupMaybe(name('S'),PDFName)?.decodeText();if(type==='URI')copied.set(name('A'),copier.copy(action));else if(type==='GoTo'){const mapped=remapDestination(input,action.get(name('D')),sourceId,targets);if(mapped)copied.set(name('A'),context.obj({S:'GoTo',D:mapped}));else omittedLinks++}else omittedLinks++}
+  if(action){const type=action.lookupMaybe(name('S'),PDFName)?.decodeText();if(type==='URI'){const uri=action.get(name('URI'));if(uri)copied.set(name('A'),context.obj({S:'URI',URI:copier.copy(uri)}));else omittedLinks++}else if(type==='GoTo'){const mapped=remapDestination(input,action.get(name('D')),sourceId,targets);if(mapped)copied.set(name('A'),context.obj({S:'GoTo',D:mapped}));else omittedLinks++}else omittedLinks++}
   const newRef=context.register(copied);refs.set(ref.toString(),newRef);pairs.push({dict,copied});page.node.addAnnot(newRef);
  }
  for(const {dict,copied}of pairs)for(const key of ['Parent','Popup','IRT']){const original=dict.get(name(key));if(original&&refs.has(original.toString()))copied.set(name(key),refs.get(original.toString()))}

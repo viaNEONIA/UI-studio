@@ -18,3 +18,9 @@ test('orphan widgets use a visual fallback without dropping links or blocking ex
  const result=await composeVectorPDF(note(await input.save(),[[300,400]]),[{elements:[]}],{renderBackground:async()=>{calls++;return png}});assert.equal(calls,1);assert.equal(result.backgroundFallbacks,1);assert((await PDFDocument.load(result.bytes)).getPageCount()===1);
 });
 test('inverse quarter-turn transforms retain native annotation coordinates',()=>{assert.deepEqual(inversePageRotation(90,300,500),[0,1,-1,0,300,0]);assert.deepEqual(inversePageRotation(270,300,500),[0,-1,1,0,0,500])});
+
+test('a text field missing its appearance can regenerate Japanese values before flattening',async()=>{
+ const {readFile}=await import('node:fs/promises'),{gunzipSync}=await import('node:zlib'),input=await PDFDocument.create(),page=input.addPage([400,600]),form=input.getForm(),field=form.createTextField('japanese');field.addToPage(page,{x:30,y:400,width:250,height:30});field.setText('承認済み');for(const widget of field.acroField.getWidgets())widget.dict.delete(N('AP'));const source=await input.save({updateFieldAppearances:false});let calls=0;
+ const result=await composeVectorPDF(note(source,[[400,600]]),[{elements:[]}],{sourceFontBytes:async()=>{calls++;return gunzipSync(await readFile('assets/KaigiNoteSansJP.ttf.gz'))}});assert.equal(calls,1);assert.equal(result.backgroundFallbacks,0);assert.equal(result.flattenedForms,1);assert.equal((await PDFDocument.load(result.bytes)).getForm().getFields().length,0);
+ const {DOMMatrix,Path2D,ImageData}=await import('@napi-rs/canvas');globalThis.DOMMatrix??=DOMMatrix;globalThis.Path2D??=Path2D;globalThis.ImageData??=ImageData;const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs'),task=pdfjs.getDocument({data:new Uint8Array(result.bytes)});try{const pdf=await task.promise,text=await(await pdf.getPage(1)).getTextContent();assert(text.items.map(i=>i.str).join('').includes('承認済み'))}finally{await task.destroy()}
+});
