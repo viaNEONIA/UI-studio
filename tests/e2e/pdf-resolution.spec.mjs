@@ -43,6 +43,7 @@ test.describe('high pixel density display',()=>{
 });
 
 test('buffered pans reuse sharp tiles, retain old pixels during refresh, and bound cache memory',async({page},info)=>{
+ await page.evaluate(()=>{const proto=window.MeetingTools.PDFPreviewCache.prototype,put=proto.put;proto.put=function(...args){window.pdfPanCache=this;return put.apply(this,args)}});
  await imported(page);await view(page,4);
  await page.evaluate(()=>{window.firstPDFTile=document.querySelector('.pdf-background-render');window.pdfPanCalls=0;const render=window.MeetingTools.renderPDFRegion;window.MeetingTools.renderPDFRegion=async(...args)=>{window.pdfPanCalls++;await new Promise(r=>setTimeout(r,350));return render(...args)}});
  await page.evaluate(()=>document.querySelector('#workspace').scrollLeft+=60);await page.waitForTimeout(400);
@@ -54,7 +55,7 @@ test('buffered pans reuse sharp tiles, retain old pixels during refresh, and bou
  expect(await page.evaluate(()=>document.querySelector('.pdf-background-render')===window.firstPDFTile)).toBe(true);
  await expect.poll(()=>page.evaluate(()=>document.querySelector('.pdf-background-render')!==window.firstPDFTile)).toBe(true);
  await expect(page.locator('img.document-background')).toHaveCSS('mask-composite','exclude');
- const stats=await page.evaluate(()=>({pixels:pdfPreviewCache.pixels,entries:pdfPreviewCache.entries.length,calls:window.pdfPanCalls}));expect(stats.pixels).toBeLessThanOrEqual(8388608);expect(stats.entries).toBeLessThanOrEqual(2);expect(stats.calls).toBe(1);
+ const stats=await page.evaluate(()=>({pixels:window.pdfPanCache.pixels,entries:window.pdfPanCache.entries.length,calls:window.pdfPanCalls}));expect(stats.pixels).toBeLessThanOrEqual(8388608);expect(stats.entries).toBeLessThanOrEqual(2);expect(stats.calls).toBe(1);
  await page.evaluate(()=>document.querySelector('#workspace').scrollLeft-=450);await page.waitForTimeout(400);expect(await page.evaluate(()=>window.pdfPanCalls)).toBe(1);
  await info.attach('pdf-pan-cache',{body:JSON.stringify(stats),contentType:'application/json'});await page.screenshot({path:info.outputPath('pdf-buffered-pan.png')});
 });
