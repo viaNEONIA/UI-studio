@@ -24,3 +24,7 @@ test('a text field missing its appearance can regenerate Japanese values before 
  const result=await composeVectorPDF(note(source,[[400,600]]),[{elements:[]}],{sourceFontBytes:async()=>{calls++;return gunzipSync(await readFile('assets/KaigiNoteSansJP.ttf.gz'))}});assert.equal(calls,1);assert.equal(result.backgroundFallbacks,0);assert.equal(result.flattenedForms,1);assert.equal((await PDFDocument.load(result.bytes)).getForm().getFields().length,0);
  const {DOMMatrix,Path2D,ImageData}=await import('@napi-rs/canvas');globalThis.DOMMatrix??=DOMMatrix;globalThis.Path2D??=Path2D;globalThis.ImageData??=ImageData;const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs'),task=pdfjs.getDocument({data:new Uint8Array(result.bytes)});try{const pdf=await task.promise,text=await(await pdf.getPage(1)).getTextContent();assert(text.items.map(i=>i.str).join('').includes('承認済み'))}finally{await task.destroy()}
 });
+
+test('unsupported form data without widgets still requests the displayed-page fallback',async()=>{
+ const {flattenSourceForms}=await import('../src/pdf-annotations.mjs'),input=await PDFDocument.create(),page=input.addPage([300,400]);input.catalog.set(N('AcroForm'),input.context.obj({Fields:[],XFA:PDFString.of('unsupported')}));const result=await flattenSourceForms(input,[page]);assert(result.fallback.has(0));
+});

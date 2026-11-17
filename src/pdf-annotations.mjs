@@ -2,13 +2,13 @@ import {PDFName,PDFArray,PDFDict,PDFNumber,PDFRef,PDFString,PDFHexString,PDFObje
 const name=s=>PDFName.of(s),subtype=a=>a.lookupMaybe(name('Subtype'),PDFName)?.decodeText();
 export function pageAnnotations(page){const list=page.node.Annots();if(!list)return [];return list.asArray().map(ref=>({ref,dict:page.doc.context.lookup(ref)})).filter(item=>item.dict instanceof PDFDict)}
 export async function flattenSourceForms(input,pages,{fontBytes,fontkit}={}){
- const original=pages.map(page=>pageAnnotations(page)),widgetPages=new Set(original.flatMap((items,i)=>items.some(a=>subtype(a.dict)==='Widget')?[i]:[]));let fields=0,fallback=new Set();
+ const original=pages.map(page=>pageAnnotations(page));let fields=0,fallback=new Set();
  const acro=input.catalog.lookupMaybe(name('AcroForm'),PDFDict);
  if(acro){try{if(acro.has(name('XFA')))throw Error('XFA');const form=input.getForm(),all=form.getFields();fields=all.length;
    const needs=acro.lookupMaybe(name('NeedAppearances'))?.toString()==='true';if(needs)all.forEach(field=>form.markFieldAsDirty(field.ref));
    if(all.some(field=>field.needsAppearancesUpdate())){let font;if(fontBytes){input.registerFontkit(fontkit);font=await input.embedFont(await fontBytes(),{subset:true})}form.updateFieldAppearances(font)}
    form.flatten({updateFieldAppearances:false});await input.flush();
-  }catch{fallback=new Set(widgetPages)}
+  }catch{fallback=new Set(pages.map((_,i)=>i))}
  }
  pages.forEach((page,i)=>{const annots=page.node.Annots();if(annots)for(let j=annots.size()-1;j>=0;j--)if(!(input.context.lookup(annots.get(j)) instanceof PDFDict))annots.remove(j);if(pageAnnotations(page).some(a=>subtype(a.dict)==='Widget'))fallback.add(i)});
  return {fields,fallback,annotations:original.map(items=>items.filter(a=>subtype(a.dict)!=='Widget'))};
