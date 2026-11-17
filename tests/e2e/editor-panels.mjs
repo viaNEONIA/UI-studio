@@ -29,7 +29,7 @@ export async function freezePendingPlacement(page){
  const type=await page.locator('#device').getAttribute('data-drawing-type');if(!['placement','axisGuide'].includes(type)||await page.locator('#finishDrawing').isEnabled())return;
  const kind=await page.locator('#device').getAttribute('data-placement-kind'),phase=await page.locator('#device').getAttribute('data-placement-phase');
  if(['box','circle'].includes(kind)&&phase==='origin'){
-  const b=await page.locator('.placement-preview').boundingBox();if(!b)return;
+  if(!await page.locator('.placement-preview').count())return;const b=await page.locator('.placement-preview').boundingBox();if(!b)return;
   if(kind==='box'){await page.mouse.click(b.x,b.y);await page.mouse.click(b.x+b.width,b.y+b.height)}else{await page.mouse.click(b.x+b.width/2,b.y+b.height/2);await page.mouse.move(b.x+b.width,b.y+b.height/2);await page.mouse.click(b.x+b.width,b.y+b.height/2)}
  }else{await page.mouse.down();await page.mouse.up()}
 }
