@@ -22,8 +22,8 @@ test('embedded original pages retain vector content and rotated crop boxes',asyn
 test('unsupported font glyphs fail instead of silently becoming missing boxes',async()=>{
  await assert.rejects(composeVectorPDF(base,[{elements:[{x:0,y:0,w:100,h:100,textRuns:[{text:'😀',x:0,baseline:20,size:16,color:[0,0,0,1]}]}]}],{fontBytes}),/glyph unavailable/);
 });
-test('source annotations are detected before producing an incomplete vector document',async()=>{
- const src=await PDFDocument.create(),page=src.addPage();page.node.set(PDFName.of('Annots'),src.context.obj([src.context.obj({Type:'Annot',Subtype:'Text',Rect:[0,0,10,10]})]));const project=structuredClone(base);project.pdfSources={a:Buffer.from(await src.save()).toString('base64')};project.screens[0].background={x:0,y:0,w:100,h:100,opacity:1,visible:true,pdf:{sourceId:'a',pageNumber:1,pageWidth:100,pageHeight:100}};await assert.rejects(composeVectorPDF(project,[{elements:[]}]),/注釈/);
+test('source text annotations are preserved instead of blocking vector export',async()=>{
+ const src=await PDFDocument.create(),page=src.addPage();page.node.set(PDFName.of('Annots'),src.context.obj([src.context.obj({Type:'Annot',Subtype:'Text',Rect:[0,0,10,10]})]));const project=structuredClone(base);project.pdfSources={a:Buffer.from(await src.save()).toString('base64')};project.screens[0].background={x:0,y:0,w:100,h:100,opacity:1,visible:true,pdf:{sourceId:'a',pageNumber:1,pageWidth:100,pageHeight:100}};const result=await composeVectorPDF(project,[{elements:[]}]);const out=await PDFDocument.load(result.bytes);assert.equal(out.getPage(0).node.Annots().size(),1);assert.equal(result.preservedAnnotations,1);
 });
 
 test('measured glyph placement preserves editor ink bounds without using the embedded font to wrap',async()=>{

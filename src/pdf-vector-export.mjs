@@ -1,3 +1,4 @@
+import {renderPDFRegion,planPDFRegion} from './pdf-background.mjs';
 import {composeVectorPDF} from './pdf-vector-core.mjs';
 import fontData from 'pdf-vector-font';
 let fontBytes,fontReady;
@@ -30,7 +31,7 @@ export async function exportVectorPDF(project,{makeNode,raster,paperMM,onProgres
    elements.push(out);
   }finally{node.remove()}}
   prepared.push({elements})}
-  const result=await composeVectorPDF(project,prepared,{fontBytes:hasText?await bytes():undefined,paperMM,onProgress});return {blob:new Blob([result.bytes],{type:'application/pdf'}),rasterized:result.rasterized};
+  const result=await composeVectorPDF(project,prepared,{fontBytes:hasText?await bytes():undefined,paperMM,onProgress,sourceFontBytes:bytes,renderBackground:async(source,pageNumber,meta)=>{const b={x:0,y:0,w:meta.pageWidth*96/72,h:meta.pageHeight*96/72},plan=planPDFRegion(meta,b,{x:0,y:0,width:b.w,height:b.h},3),canvas=document.createElement('canvas');try{await renderPDFRegion(source,pageNumber,plan,canvas);return canvas.toDataURL('image/png')}finally{canvas.width=canvas.height=0}}});return {...result,blob:new Blob([result.bytes],{type:'application/pdf'}),rasterized:result.rasterized};
  }catch(error){if(/cannot encode|glyph|font|subset/i.test(error.message))throw Error('PDF用フォントに含まれない文字・記号があるか、フォント処理に失敗しました。文字を変更してください: '+error.message);throw error}
  finally{host.remove()}
 }
