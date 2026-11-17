@@ -1,3 +1,4 @@
+import {planPDFPreview,containsPDFRegion,PDFPreviewCache} from './pdf-preview-cache.mjs';
 import {readPDF,renderPDFRegion,releasePDF,planPDFRegion} from './pdf-background.mjs';
 import html2canvas from 'html2canvas';
 import {exportVectorPDF} from './pdf-vector-export.mjs';
@@ -13,4 +14,4 @@ async function raster(node,width,height,options={}){
 }
 function paperSize(w,h){const preset={'794,1123':[210,297],'1123,794':[297,210],'1123,1587':[297,420],'1587,1123':[420,297],'1587,2245':[420,594],'2245,1587':[594,420],'2245,3179':[594,841],'3179,2245':[841,594]};return preset[w+','+h]||[w*25.4/96,h*25.4/96]}
 async function exportPPTX(images,width,height,names){const [w,h]=paperSize(width,height),pptx=new PptxGenJS();pptx.defineLayout({name:'DOCUMENT',width:w/25.4,height:h/25.4});pptx.layout='DOCUMENT';pptx.author='会議ノート';pptx.subject='会議資料（画像として出力）';for(let i=0;i<images.length;i++){const slide=pptx.addSlide();slide.addImage({data:images[i],x:0,y:0,w:w/25.4,h:h/25.4});slide.addNotes(names[i])}return pptx.write({outputType:'blob'})}
-window.MeetingTools={renderPDFRegion,releasePDF,planPDFRegion,readPDF,raster,exportVectorPDF,exportPPTX,paperSize};
+window.MeetingTools={planPDFPreview,containsPDFRegion,PDFPreviewCache,renderPDFRegion,releasePDF,planPDFRegion,readPDF,raster,exportVectorPDF,exportPPTX,paperSize};

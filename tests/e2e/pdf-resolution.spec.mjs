@@ -41,3 +41,28 @@ test.describe('high pixel density display',()=>{
   await imported(page);await view(page,2);const density=await page.locator('.pdf-background-render').evaluate(c=>({x:c.width/c.getBoundingClientRect().width,y:c.height/c.getBoundingClientRect().height,pixels:c.width*c.height}));expect(density.x).toBeCloseTo(2,1);expect(density.y).toBeCloseTo(2,1);expect(density.pixels).toBeLessThanOrEqual(8388608);
  });
 });
+
+test('buffered pans reuse sharp tiles, retain old pixels during refresh, and bound cache memory',async({page},info)=>{
+ await page.evaluate(()=>{const proto=window.MeetingTools.PDFPreviewCache.prototype,put=proto.put;proto.put=function(...args){window.pdfPanCache=this;return put.apply(this,args)}});
+ await imported(page);await view(page,4);
+ await page.evaluate(()=>{window.firstPDFTile=document.querySelector('.pdf-background-render');window.pdfPanCalls=0;const render=window.MeetingTools.renderPDFRegion;window.MeetingTools.renderPDFRegion=async(...args)=>{window.pdfPanCalls++;await new Promise(r=>setTimeout(r,350));return render(...args)}});
+ await page.evaluate(()=>document.querySelector('#workspace').scrollLeft+=60);await page.waitForTimeout(400);
+ expect(await page.evaluate(()=>window.pdfPanCalls)).toBe(0);expect(await page.evaluate(()=>document.querySelector('.pdf-background-render')===window.firstPDFTile)).toBe(true);
+ // A UI rebuild must also reuse the completed bitmap without another PDF render.
+ await page.locator('#bgOpacity').fill('50');await page.locator('#bgOpacity').dispatchEvent('change');await page.waitForTimeout(250);expect(await page.evaluate(()=>window.pdfPanCalls)).toBe(0);
+ await page.evaluate(()=>document.querySelector('#workspace').scrollLeft+=450);
+ await expect.poll(()=>page.evaluate(()=>window.pdfPanCalls)).toBe(1);
+ expect(await page.evaluate(()=>document.querySelector('.pdf-background-render')===window.firstPDFTile)).toBe(true);
+ await expect.poll(()=>page.evaluate(()=>document.querySelector('.pdf-background-render')!==window.firstPDFTile)).toBe(true);
+ await expect(page.locator('img.document-background')).toHaveCSS('mask-composite',/^exclude(?:, exclude)?$/);
+ const stats=await page.evaluate(()=>({pixels:window.pdfPanCache.pixels,entries:window.pdfPanCache.entries.length,calls:window.pdfPanCalls}));expect(stats.pixels).toBeLessThanOrEqual(8388608);expect(stats.entries).toBeLessThanOrEqual(2);expect(stats.calls).toBe(1);
+ await page.evaluate(()=>document.querySelector('#workspace').scrollLeft-=450);await page.waitForTimeout(400);expect(await page.evaluate(()=>window.pdfPanCalls)).toBe(1);
+ await info.attach('pdf-pan-cache',{body:JSON.stringify(stats),contentType:'application/json'});await page.screenshot({path:info.outputPath('pdf-buffered-pan.png')});
+});
+
+test('PDF parsing uses a real offline worker with a functional fallback when workers are blocked',async({page})=>{
+ const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);await imported(page,sample(1));await view(page,4);
+ expect(page.workers().some(worker=>worker.url().startsWith('blob:'))).toBe(true);expect(await page.evaluate(()=>!!globalThis.pdfjsWorker?.WorkerMessageHandler)).toBe(false);
+ await page.locator('#bgRemove').click();await expect.poll(()=>page.workers().length).toBe(0);
+ await page.addInitScript(()=>{window.Worker=class{constructor(){throw Error('Worker blocked for fallback test')}}});await page.reload();await expandEditorPanels(page);await imported(page,sample(1));await view(page,4);expect(await page.evaluate(()=>!!globalThis.pdfjsWorker?.WorkerMessageHandler)).toBe(true);
+});
