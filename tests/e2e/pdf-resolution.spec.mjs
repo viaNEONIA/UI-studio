@@ -54,14 +54,14 @@ test('buffered pans reuse sharp tiles, retain old pixels during refresh, and bou
  await expect.poll(()=>page.evaluate(()=>window.pdfPanCalls)).toBe(1);
  expect(await page.evaluate(()=>document.querySelector('.pdf-background-render')===window.firstPDFTile)).toBe(true);
  await expect.poll(()=>page.evaluate(()=>document.querySelector('.pdf-background-render')!==window.firstPDFTile)).toBe(true);
- await expect(page.locator('img.document-background')).toHaveCSS('mask-composite','exclude');
+ await expect(page.locator('img.document-background')).toHaveCSS('mask-composite',/^exclude(?:, exclude)?$/);
  const stats=await page.evaluate(()=>({pixels:window.pdfPanCache.pixels,entries:window.pdfPanCache.entries.length,calls:window.pdfPanCalls}));expect(stats.pixels).toBeLessThanOrEqual(8388608);expect(stats.entries).toBeLessThanOrEqual(2);expect(stats.calls).toBe(1);
  await page.evaluate(()=>document.querySelector('#workspace').scrollLeft-=450);await page.waitForTimeout(400);expect(await page.evaluate(()=>window.pdfPanCalls)).toBe(1);
  await info.attach('pdf-pan-cache',{body:JSON.stringify(stats),contentType:'application/json'});await page.screenshot({path:info.outputPath('pdf-buffered-pan.png')});
 });
 
 test('PDF parsing uses a real offline worker with a functional fallback when workers are blocked',async({page})=>{
- const {pathToFileURL}=await import('node:url');await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);await imported(page,sample(1));await view(page,4);
- expect(page.workers().some(worker=>worker.url().startsWith('blob:'))).toBe(true);expect(await page.evaluate(()=>!!globalThis.pdfjsWorker?.WorkerMessageHandler)).toBe(false);
+ const {pathToFileURL}=await import('node:url');await page.addInitScript(()=>{window.pdfWorkerErrors=[];const W=window.Worker;window.Worker=class extends W{constructor(...args){try{super(...args);this.addEventListener('error',e=>window.pdfWorkerErrors.push({message:e.message,filename:e.filename}));window.pdfWorkerErrors.push({url:args[0]})}catch(e){window.pdfWorkerErrors.push({message:e.message});throw e}}}});await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);await expandEditorPanels(page);await imported(page,sample(1));await view(page,4);
+ expect({workers:page.workers().map(w=>w.url()),diagnostics:await page.evaluate(()=>({errors:window.pdfWorkerErrors,fake:!!globalThis.pdfjsWorker?.WorkerMessageHandler}))}).toMatchObject({diagnostics:{fake:false}});expect(page.workers().some(worker=>worker.url().startsWith('blob:'))).toBe(true);expect(await page.evaluate(()=>!!globalThis.pdfjsWorker?.WorkerMessageHandler)).toBe(false);
  await page.addInitScript(()=>{window.Worker=class{constructor(){throw Error('Worker blocked for fallback test')}}});await page.reload();await expandEditorPanels(page);await imported(page,sample(1));await view(page,4);expect(await page.evaluate(()=>!!globalThis.pdfjsWorker?.WorkerMessageHandler)).toBe(true);
 });
