@@ -31,7 +31,7 @@ function editorContext(){
  const ctx=vm.createContext({project,screenId:'s',drawing:null,viewOnly:false,Math,Number,Set,Error,uid:()=>String(++counter),screen:()=>project.screens[0],snapshot(){},render(){},showDrawing(){},tell(){},applyDefaultProperties(){},multi:new Set()});
  const t=html.indexOf('const types='),te=html.indexOf(';let drawing',t);vm.runInContext(html.slice(t,te)+';',ctx);
  const d=html.indexOf('const defaults='),de=html.indexOf(';function makeObject',d);vm.runInContext(html.slice(d,de)+';',ctx);
- for(const name of ['isLine','isShape','makeObject','positionPlacement','finishDrawing'])vm.runInContext(fn(name),ctx);
+ for(const name of ['isLine','isShape','makeObject','midpoint','drawingNeedsReference','placementPoint','positionPlacement','finishDrawing'])vm.runInContext(fn(name),ctx);
  return ctx;
 }
 test('all line and shape factories use red 2px and shapes start with transparent fills',()=>{
@@ -54,4 +54,14 @@ test('constrained segment snapping uses actual intersections without extending s
  assert.deepEqual(Array.from(context.segmentSnapPoint([50,100],[350,400],[122,180],{axis:1,value:180})),[130,180]);
  assert.equal(context.segmentSnapPoint([50,100],[350,400],[122,180],{axis:1,value:500}),null);
  assert.deepEqual(Array.from(context.segmentSnapPoint([50,100],[350,100],[122,110],{axis:1,value:100})),[122,100]);
+});
+
+test('two reference points place an object center without adding the reference points to the project',()=>{
+ const ctx=editorContext(),object=ctx.makeObject('text');ctx.drawing={type:'placement',object,screenId:'s',referencePoints:[[80,120]],points:[]};ctx.finishDrawing();assert.equal(ctx.project.screens[0].elements.length,0);ctx.drawing.referencePoints.push([320,280]);ctx.finishDrawing();assert.equal(object.x+object.w/2,200);assert.equal(object.y+object.h/2,200);assert.equal(ctx.project.screens[0].elements.length,1);assert.deepEqual(ctx.project.screens[0].guidelines,[]);
+});
+test('midpoint-start line keeps the chosen center and restarts reference selection for the next line',()=>{
+ const ctx=editorContext();ctx.drawing={type:'line',screenId:'s',referencePoints:[[80,120],[320,280]],points:[[200,200],[300,250]]};ctx.finishDrawing();const e=ctx.project.screens[0].elements[0];assert.equal(e.x+e.points[0][0]*e.w,200);assert.equal(e.y+e.points[0][1]*e.h,200);assert.equal(ctx.drawing.referencePoints.length,0);assert.equal(ctx.drawing.points.length,0);
+});
+test('finite-guide midpoint candidates handle reversed and diagonal segments and exclude infinite guides',()=>{
+ const project={width:500,height:400},gs=[{id:'a',x:300,y:200,dx:-200,dy:0,segment:true},{id:'b',x:100,y:100,dx:200,dy:200,segment:true},{id:'old',x:0,y:50,dx:1,dy:0}];const ctx=vm.createContext({project,screen:()=>({guidelines:gs}),Math,Number});for(const name of ['midpoint','insideCanvas','satisfiesAngleConstraint','guideMidpoints'])vm.runInContext(fn(name),ctx);assert.deepEqual(Array.from(ctx.guideMidpoints(),a=>[a.id,...a.point]),[['a',200,200],['b',200,200]]);assert.equal(ctx.guideMidpoints({axis:1,value:210}).length,0);
 });

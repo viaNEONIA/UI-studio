@@ -1,5 +1,6 @@
 import {PDFDocument,PDFName,PDFObjectCopier,PDFRawStream,rgb,degrees,LineCapStyle,LineJoinStyle,pushGraphicsState,popGraphicsState,concatTransformationMatrix,rectangle,clip,endPath,setLineJoin} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import {alignedFontkit} from './pdf-fontkit.mjs';
 export function backgroundPlacement(b,meta,crop,rotation,pageHeight){
  const angle=((rotation%360)+360)%360;if(![0,90,180,270].includes(angle))throw Error('元PDFの回転角度に対応していません');
  const fit=Math.min(b.w/meta.pageWidth,b.h/meta.pageHeight),w=meta.pageWidth*fit,h=meta.pageHeight*fit,left=b.x+(b.w-w)/2,bottom=pageHeight-b.y-(b.h-h)/2-h;
@@ -21,8 +22,9 @@ export function textRunPlacement(run,font,metrics){
  return {sx,sy,x,y};
 }
 export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress}={}){
- const doc=await PDFDocument.create();doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(fontkit);
- let font,metrics;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:false});metrics=fontkit.create(fontBytes);const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
+ const doc=await PDFDocument.create();doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(alignedFontkit);
+ let font,metrics;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:true});metrics=fontkit.create(fontBytes);const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
+ const images=new Map(),imageFor=src=>{if(!images.has(src))images.set(src,embedImage(doc,src));return images.get(src)};
  const embedded=new Map();
  for(const sourceId of new Set(project.screens.filter(s=>s.background?.visible&&s.background.pdf).map(s=>s.background.pdf.sourceId))){
   const source=project.pdfSources?.[sourceId];if(!source)throw Error('元PDFがありません');const input=await PDFDocument.load(Uint8Array.from(atob(source),c=>c.charCodeAt(0)),{updateMetadata:false});
@@ -36,11 +38,11 @@ export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onPro
  let rasterized=0;
  for(let i=0;i<prepared.length;i++){
   onProgress?.(i+1,prepared.length);const page=doc.addPage([pw,ph]),sc=project.screens[i];page.drawRectangle({x:0,y:0,width:pw,height:ph,color:rgb(1,1,1)});page.pushOperators(pushGraphicsState(),concatTransformationMatrix(pw/project.width,0,0,ph/project.height,0,0));clipBox(page,0,0,project.width,project.height);
-  const bg=sc.background;if(bg?.visible){if(bg.pdf){const item=embedded.get(bg.pdf.sourceId+':'+bg.pdf.pageNumber);page.drawPage(item.form,backgroundPlacement(bg,bg.pdf,item.crop,item.rotation,project.height))}else{const image=await embedImage(doc,bg.src);const fit=Math.min(bg.w/image.width,bg.h/image.height),w=image.width*fit,h=image.height*fit;page.drawImage(image,{x:bg.x+(bg.w-w)/2,y:project.height-bg.y-(bg.h-h)/2-h,width:w,height:h,opacity:bg.opacity})}}
+  const bg=sc.background;if(bg?.visible){if(bg.pdf){const item=embedded.get(bg.pdf.sourceId+':'+bg.pdf.pageNumber);page.drawPage(item.form,backgroundPlacement(bg,bg.pdf,item.crop,item.rotation,project.height))}else{const image=await imageFor(bg.src);const fit=Math.min(bg.w/image.width,bg.h/image.height),w=image.width*fit,h=image.height*fit;page.drawImage(image,{x:bg.x+(bg.w-w)/2,y:project.height-bg.y-(bg.h-h)/2-h,width:w,height:h,opacity:bg.opacity})}}
   for(const e of prepared[i].elements){
    const bottom=project.height-e.y-e.h;
    if(e.paths){page.pushOperators(pushGraphicsState(),setLineJoin(LineJoinStyle.Round));for(const path of e.paths){const fill=path.fill?.[3]>0?color(path.fill):undefined,stroke=path.stroke?.[3]>0&&path.width>0?color(path.stroke):undefined;if(fill||stroke)page.drawSvgPath(path.d,{x:e.x,y:project.height-e.y,scale:1,color:fill,borderColor:stroke,borderWidth:stroke?path.width:0,opacity:path.fill?.[3]??1,borderOpacity:(path.stroke?.[3]??1)*path.strokeOpacity,borderLineCap:LineCapStyle.Round})}page.pushOperators(popGraphicsState())}
-   if(e.image){clipBox(page,e.x,bottom,e.w,e.h);const image=await embedImage(doc,e.image),fit=e.cover?Math.max(e.w/image.width,e.h/image.height):1,w=e.cover?image.width*fit:e.w,h=e.cover?image.height*fit:e.h;page.drawImage(image,{x:e.x+(e.w-w)/2,y:bottom+(e.h-h)/2,width:w,height:h});page.pushOperators(popGraphicsState());if(e.rasterized)rasterized++}
+   if(e.image){clipBox(page,e.x,bottom,e.w,e.h);const image=await imageFor(e.image),fit=e.cover?Math.max(e.w/image.width,e.h/image.height):1,w=e.cover?image.width*fit:e.w,h=e.cover?image.height*fit:e.h;page.drawImage(image,{x:e.x+(e.w-w)/2,y:bottom+(e.h-h)/2,width:w,height:h});page.pushOperators(popGraphicsState());if(e.rasterized)rasterized++}
    if(e.textRuns?.length){clipBox(page,e.x,bottom,e.w,e.h);for(const run of e.textRuns){const p=textRunPlacement(run,font,metrics);page.pushOperators(pushGraphicsState(),concatTransformationMatrix(p.sx,0,0,p.sy,p.x,project.height+p.y));page.drawText(run.text,{x:0,y:0,font,size:run.size,color:color(run.color),opacity:run.color[3]});page.pushOperators(popGraphicsState())}page.pushOperators(popGraphicsState())}
   }
   page.pushOperators(popGraphicsState(),popGraphicsState());

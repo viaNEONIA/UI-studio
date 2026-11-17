@@ -35,3 +35,17 @@ test('spaces and older prepared text remain finite and keep their original basel
  assert.deepEqual(textRunPlacement({text:'A',x:12,baseline:30,size:18},embedded,metrics),{sx:1,sy:1,x:12,y:-30});
  const p=textRunPlacement({text:' ',x:12,baseline:30,size:18,width:8,ink:{left:0,right:0,ascent:0,descent:0}},embedded,metrics);assert.equal(p.y,-30);assert.ok(Number.isFinite(p.sx)&&p.sx>0);
 });
+
+test('Japanese text embeds only used glyphs and reuses one font across pages',async()=>{
+ const text='会議ノート 確認事項 ABC',project={...base,screens:[{id:'a',name:'a',elements:[]},{id:'b',name:'b',elements:[]}]},element={x:10,y:10,w:400,h:200,textRuns:[...text].map((ch,i)=>({text:ch,x:20+i*20,baseline:60,size:18,color:[0,0,0,1]}))};const {bytes}=await composeVectorPDF(project,[{elements:[element]},{elements:[element]}],{fontBytes});assert.ok(bytes.length<50000,'short Japanese text must not embed megabytes of unused glyphs: '+bytes.length);const out=await PDFDocument.load(bytes);const refs=out.getPages().map(p=>p.node.Resources().lookup(PDFName.of('Font')).values().map(r=>r.toString()));assert.deepEqual(refs[0],refs[1]);
+});
+test('repeated backgrounds and placed copies share the same embedded image data',async()=>{
+ // Use the known-good alpha PNG fixture also used by browser import/export tests.
+ const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+ const p={...base,screens:['a','b'].map(id=>({id,name:id,elements:[],background:{src:png,x:0,y:0,w:100,h:100,visible:true,opacity:1}}))},e={x:120,y:100,w:100,h:100,image:png};const {bytes}=await composeVectorPDF(p,[{elements:[e,e]},{elements:[e]}]);const out=await PDFDocument.load(bytes),refs=out.getPages().flatMap(page=>page.node.Resources().lookup(PDFName.of('XObject')).values().map(r=>r.toString()));assert.equal(new Set(refs).size,1);
+});
+
+test('TrueType subsets keep odd-length Japanese glyph records intact instead of truncating loca offsets',async()=>{
+ const {alignedFontkit}=await import('../src/pdf-fontkit.mjs'),raw=(await import('@pdf-lib/fontkit')).default,source=alignedFontkit.create(fontBytes),subset=source.createSubset(),glyphs=[...new Set([...('会議の確認事項照明位置を変更がéABC')].map(ch=>source.glyphForCodePoint(ch.codePointAt(0)).id))],mapping=glyphs.map(id=>[id,subset.includeGlyph(id)]);
+ const data=await new Promise((resolve,reject)=>{const parts=[];subset.encodeStream().on('data',b=>parts.push(b)).on('error',reject).on('end',()=>resolve(new Uint8Array(Buffer.concat(parts))))}),decoded=raw.create(data);assert.ok(decoded.loca.offsets.every(n=>n%2===0));for(const [original,id]of mapping)assert.deepEqual(decoded.getGlyph(id).path.commands,source.getGlyph(original).path.commands,'glyph '+original+' must retain every contour');
+});
