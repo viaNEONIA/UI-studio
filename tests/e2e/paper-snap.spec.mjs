@@ -1,3 +1,4 @@
+import {confirmTwoPointDraft} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
@@ -32,6 +33,6 @@ test('Ctrl ignores the line being edited and snaps to thirds of another line',as
  const p=data();p.screens[0].elements[0]=item('box','line',300,300,180,20,{stroke:'#172235',strokeWidth:3,points:[[0,0],[1,0]]});await load(page,p);await beginDrag(page);await page.keyboard.down('Control');let target=await screenPoint(page,130,130);await page.mouse.move(target.x,target.y);await expect(page.locator('.connection-snap')).toHaveCount(0);target=await screenPoint(page,364,303);await page.mouse.move(target.x,target.y);await expect(page.locator('.connection-snap')).toHaveAttribute('data-label','線の三分割点');await page.mouse.up();await page.keyboard.up('Control');const end=positions((await saved(page)).screens[0].elements[1])[1];expect(end[0]).toBeCloseTo(360,6);expect(end[1]).toBeCloseTo(300,6);
 });
 test('Ctrl drawing snaps both click endpoints and Shift keeps the horizontal constraint',async({page})=>{
- await load(page);await page.locator('#drawArrow').click();await page.keyboard.down('Control');let p=await screenPoint(page,395,284);await page.mouse.click(p.x,p.y);p=await screenPoint(page,304,283);await page.mouse.click(p.x,p.y);await page.keyboard.up('Control');const elements=(await saved(page)).screens[0].elements,endpoints=positions(elements[2]);expect(endpoints).toEqual([[390,280],[300,280]]);
+ await load(page);await page.locator('#drawArrow').click();await page.keyboard.down('Control');let p=await screenPoint(page,395,284);await page.mouse.click(p.x,p.y);await confirmTwoPointDraft(page);p=await screenPoint(page,304,283);await page.mouse.click(p.x,p.y);await confirmTwoPointDraft(page);await page.keyboard.up('Control');const elements=(await saved(page)).screens[0].elements,endpoints=positions(elements[2]);expect(endpoints).toEqual([[390,280],[300,280]]);
  const next=data();next.screens[0].elements[1].y=280;await load(page,next);await beginDrag(page);await page.keyboard.down('Shift');await page.keyboard.down('Control');p=await screenPoint(page,396,284);await page.mouse.move(p.x,p.y);await expect(page.locator('.connection-snap')).toHaveCount(1);await page.mouse.up();await page.keyboard.up('Control');await page.keyboard.up('Shift');const snapped=positions((await saved(page)).screens[0].elements[1]);expect(snapped[0]).toEqual([80,280]);expect(snapped[1]).toEqual([390,280]);
 });

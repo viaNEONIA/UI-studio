@@ -1,9 +1,10 @@
+import {placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
-async function add(page,name){await page.locator('#components button').getByText(name,{exact:true}).click();await placePendingObject(page)}
+async function add(page,name){await page.locator('#components button').getByText(name,{exact:true}).click();await placePendingObject(page);await placeDefaultLine(page)}
 async function slider(page,id,from,to){const range=page.locator(id);await range.scrollIntoViewIfNeeded();const b=await range.boundingBox();const x=f=>b.x+8+(b.width-16)*f,y=b.y+b.height/2;await page.mouse.move(x(from),y);await page.mouse.down();await page.mouse.move(x(to),y,{steps:12});return async()=>page.mouse.up()}
 const dialog=page=>page.locator('#textEditDialog');
 test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});

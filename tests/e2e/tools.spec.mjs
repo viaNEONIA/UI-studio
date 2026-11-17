@@ -1,3 +1,4 @@
+import {confirmTwoPointDraft} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
@@ -21,7 +22,7 @@ test('locked layers resist drag, text edit, deletion and group movement; unlock 
 });
 test('stamp image can be placed repeatedly and saved with its palette',async({page})=>{
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
- await page.locator('#stampFile').setInputFiles({name:'stamp.png',mimeType:'image/png',buffer:png});await expect(page.locator('#stampPalette button')).toHaveCount(1);await page.locator('#stampPalette button').click();await page.locator('#stampPalette button').click();let p=await saved(page);expect(p.stamps).toHaveLength(1);expect(p.screens[0].elements).toHaveLength(2);expect(p.screens[0].elements[0].text).toMatch(/^data:image\/png;base64,/);
+ await page.locator('#stampFile').setInputFiles({name:'stamp.png',mimeType:'image/png',buffer:png});await expect(page.locator('#stampPalette button')).toHaveCount(1);await page.locator('#stampPalette button').click();await placePendingObject(page);await page.locator('#stampPalette button').click();await placePendingObject(page);let p=await saved(page);expect(p.stamps).toHaveLength(1);expect(p.screens[0].elements).toHaveLength(2);expect(p.screens[0].elements[0].text).toMatch(/^data:image\/png;base64,/);
  await page.locator('#file').setInputFiles({name:'stamp-project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await expect(page.locator('#stampPalette button')).toHaveCount(1);expect(await saved(page)).toEqual(p);
 });
 test('text aligns horizontally and vertically without changing the outer position',async({page})=>{
@@ -35,10 +36,10 @@ test('wheel-only zoom, middle drag and arrow pan work in editing and viewing',as
  const old=Number(await page.locator('#zoom').inputValue());await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.wheel(0,100);await expect.poll(async()=>Number(await page.locator('#zoom').inputValue())).toBeLessThan(old);
 });
 test('Shift constrains successive drawing segments to horizontal or vertical',async({page})=>{
- await page.locator('#drawPolyline').click();const r=await page.locator('#device').boundingBox();await page.mouse.click(r.x+30,r.y+50);await page.keyboard.down('Shift');await page.mouse.click(r.x+150,r.y+80);await page.mouse.click(r.x+180,r.y+190);await page.keyboard.up('Shift');await page.locator('#finishDrawing').click();const e=(await saved(page)).screens[0].elements[0];expect(e.points[0][1]).toBe(e.points[1][1]);expect(e.points[1][0]).toBe(e.points[2][0]);
+ await page.locator('#drawPolyline').click();const r=await page.locator('#device').boundingBox();await page.mouse.click(r.x+30,r.y+50);await confirmTwoPointDraft(page);await page.keyboard.down('Shift');await page.mouse.click(r.x+150,r.y+80);await confirmTwoPointDraft(page);await page.mouse.click(r.x+180,r.y+190);await confirmTwoPointDraft(page);await page.keyboard.up('Shift');await page.locator('#finishDrawing').click();const e=(await saved(page)).screens[0].elements[0];expect(e.points[0][1]).toBe(e.points[1][1]);expect(e.points[1][0]).toBe(e.points[2][0]);
 });
 test('laser works in meeting and editing without modifying or exporting project data',async({page})=>{
- const before=await saved(page);await page.locator('#laserTool').click();const r=await page.locator('#workspace').boundingBox();await page.mouse.move(r.x+90,r.y+90);await expect(page.locator('.laser-dot')).toBeVisible();await page.mouse.click(r.x+90,r.y+90);expect(await saved(page)).toEqual(before);
+ const before=await saved(page);await page.locator('#laserTool').click();const r=await page.locator('#workspace').boundingBox();await page.mouse.move(r.x+90,r.y+90);await expect(page.locator('.laser-dot')).toBeVisible();await page.mouse.click(r.x+90,r.y+90);await confirmTwoPointDraft(page);expect(await saved(page)).toEqual(before);
  await page.locator('#meetingMode').click();await page.mouse.move(r.x+120,r.y+120);await expect(page.locator('.laser-dot')).toBeVisible();expect(await saved(page)).toEqual(before);await page.keyboard.press('Escape');await expect(page.locator('.laser-dot')).toBeHidden();
 });
 test('shape fill and independent outline alpha survive raster export',async({page})=>{

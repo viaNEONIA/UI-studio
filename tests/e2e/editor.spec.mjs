@@ -1,3 +1,4 @@
+import {confirmTwoPointDraft} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import { test, expect } from '@playwright/test';
@@ -121,10 +122,10 @@ test('draw polyline and curve, adjust stroke palette and export SVG',async({page
  const html=await download(page,'#exportHtml');await page.setContent(html);await expect(page.locator('svg')).toHaveCount(2);await expect(page.locator('svg g').first()).toHaveAttribute('stroke','#ef4444');
 });
 test('straight line and arrow finish at two points, undo and cancellation',async({page})=>{
- const r=await page.locator('#device').boundingBox();for(const [id,y]of [['drawLine',80],['drawArrow',200]]){await page.locator('#'+id).click();await placePendingObject(page);await page.mouse.click(r.x+30,r.y+y);await page.mouse.click(r.x+180,r.y+y+30)}
+ const r=await page.locator('#device').boundingBox();for(const [id,y]of [['drawLine',80],['drawArrow',200]]){await page.locator('#'+id).click();await placePendingObject(page);await page.mouse.click(r.x+30,r.y+y);await confirmTwoPointDraft(page);await page.mouse.click(r.x+180,r.y+y+30);await confirmTwoPointDraft(page)}
  await expect(page.locator('.element')).toHaveCount(2);await expect(page.locator('.element').last().locator('svg g path')).toHaveCount(2);
  await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(1);await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(2);
- await page.locator('#drawPolyline').click();await page.mouse.click(r.x+30,r.y+300);await page.locator('#cancelDrawing').click();await expect(page.locator('.drawing-preview')).toHaveCount(0);await expect(page.locator('.element')).toHaveCount(2);
+ await page.locator('#drawPolyline').click();await page.mouse.click(r.x+30,r.y+300);await confirmTwoPointDraft(page);await page.locator('#cancelDrawing').click();await expect(page.locator('.drawing-preview')).toHaveCount(0);await expect(page.locator('.element')).toHaveCount(2);
 });
 for(const type of ['line','arrow','polyline','curve']){
  test(`${type} vertex drag preserves other points, undo and JSON/export`,async({page})=>{

@@ -1,3 +1,4 @@
+import {placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
@@ -22,7 +23,7 @@ test('PDF pages become locked bottom backgrounds; edits and full JSON/HTML round
 });
 test('PDF and PPTX export all pages at physical A4 size including backgrounds and SVG',async({page},testInfo)=>{
  test.setTimeout(120000);await page.locator('#preset').selectOption('794,1123');await importPDF(page);
- await page.locator('#components button').getByText('矢印',{exact:true}).click();await page.locator('#pStrokeWidth').fill('3');await page.locator('#pStroke').fill('#172235');
+ await page.locator('#components button').getByText('矢印',{exact:true}).click();await placeDefaultLine(page);await page.locator('#pStrokeWidth').fill('3');await page.locator('#pStroke').fill('#172235');
  const pdf=await download(page,'#exportPdf');expect(pdf.subarray(0,5).toString()).toBe('%PDF-');const text=pdf.toString('latin1');expect((text.match(/\/Type \/Page\b/g)||[])).toHaveLength(2);expect(text).toMatch(/595\.2\d* 841\.8\d*/);
  const pptx=await download(page,'#exportPptx'),zip=await JSZip.loadAsync(pptx);expect(Object.keys(zip.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n))).toHaveLength(2);expect(Object.keys(zip.files).filter(n=>/^ppt\/media\/.*\.png$/.test(n)).length).toBeGreaterThanOrEqual(2);expect(await zip.file('ppt/presentation.xml').async('string')).toContain('cx="7560000" cy="10692000"');
  const slide=await zip.file('ppt/slides/slide1.xml').async('string');expect(slide).toContain('<p:pic>');
