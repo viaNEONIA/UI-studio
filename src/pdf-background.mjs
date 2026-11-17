@@ -2,12 +2,12 @@ import * as pdfjs from 'pdfjs-dist/build/pdf.mjs';
 import workerSource from 'pdf-worker-code';
 import assets from 'pdf-assets';
 export {planPDFRegion} from './pdf-render-plan.mjs';
-// Start the embedded module directly: PDF.js's cross-origin import wrapper cannot
-// import a second opaque-origin Blob when the standalone HTML uses file://.
+// Classic Blob workers work from standalone file:// pages in Chromium, unlike
+// module workers with opaque origins. The fallback module exports the handler.
 const workerURL=URL.createObjectURL(new Blob([workerSource],{type:'text/javascript'}));
-pdfjs.GlobalWorkerOptions.workerSrc=workerURL;
+pdfjs.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([workerSource,'\nexport const WorkerMessageHandler=globalThis.pdfjsWorker.WorkerMessageHandler;'],{type:'text/javascript'}));
 async function startPDFWorker(){
- const port=new Worker(workerURL,{type:'module'});
+ const port=new Worker(workerURL);
  try{
   await new Promise((resolve,reject)=>{
    const finish=error=>{clearTimeout(timer);port.removeEventListener('message',ready);port.removeEventListener('error',failed);error?reject(error):resolve()};
