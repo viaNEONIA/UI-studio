@@ -1,3 +1,4 @@
+import {flattenSourceForms,preserveAnnotations,inversePageRotation} from './pdf-annotations.mjs';
 import {pageBox} from './page-geometry.mjs';
 import {PDFDocument,PDFName,PDFObjectCopier,PDFRawStream,rgb,degrees,LineCapStyle,LineJoinStyle,pushGraphicsState,popGraphicsState,concatTransformationMatrix,rectangle,clip,endPath,setLineJoin} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -22,24 +23,25 @@ export function textRunPlacement(run,font,metrics){
  }
  return {sx,sy,x,y};
 }
-export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress}={}){
+export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress,sourceFontBytes,renderBackground}={}){
  const doc=await PDFDocument.create();doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(alignedFontkit);
  let font,metrics;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:true});metrics=fontkit.create(fontBytes);const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
  const images=new Map(),imageFor=src=>{if(!images.has(src))images.set(src,embedImage(doc,src));return images.get(src)};
- const embedded=new Map();
+ const embedded=new Map();let flattenedForms=0,backgroundFallbacks=0,preservedAnnotations=0,omittedLinks=0;
  for(const sourceId of new Set(project.screens.filter(s=>s.background?.visible&&s.background.pdf).map(s=>s.background.pdf.sourceId))){
   const source=project.pdfSources?.[sourceId];if(!source)throw Error('元PDFがありません');const input=await PDFDocument.load(Uint8Array.from(atob(source),c=>c.charCodeAt(0)),{updateMetadata:false});
   const indexes=[...new Set(project.screens.filter(s=>s.background?.visible&&s.background.pdf?.sourceId===sourceId).map(s=>s.background.pdf.pageNumber-1))],pages=indexes.map(i=>{if(i<0||i>=input.getPageCount())throw Error('元PDFのページ番号が正しくありません');return input.getPage(i)});
-  for(const page of pages)if(page.node.Annots()?.size())throw Error('元PDFに注釈・フォーム・リンクがあります。欠落を防ぐためベクター出力を中止しました。元PDF側で注釈等をページ内容に統合してから取り込んでください');
+  const flattened=await flattenSourceForms(input,pages,{fontBytes:sourceFontBytes,fontkit:alignedFontkit});flattenedForms+=flattened.fields;
+  for(const p of pages)p.node.delete(PDFName.of('Annots'));
   for(const p of pages)if(!p.node.Contents())p.pushOperators(pushGraphicsState(),popGraphicsState());
-  const boxes=pages.map(p=>{const b=p.getCropBox();return {left:b.x,bottom:b.y,right:b.x+b.width,top:b.y+b.height}}),forms=await doc.embedPages(pages,boxes),copier=PDFObjectCopier.for(input.context,doc.context);
-  for(let i=0;i<forms.length;i++){const form=forms[i];await form.embed();const stream=doc.context.lookup(form.ref,PDFRawStream),group=pages[i].node.get(PDFName.of('Group'));stream.dict.set(PDFName.of('Group'),group?copier.copy(group):doc.context.obj({S:'Transparency',I:true,CS:'DeviceRGB'}));embedded.set(sourceId+':'+(indexes[i]+1),{form,crop:pages[i].getCropBox(),rotation:pages[i].getRotation().angle})}
+  const nativeIndexes=pages.map((_,i)=>i).filter(i=>!flattened.fallback.has(i)),nativePages=nativeIndexes.map(i=>pages[i]),boxes=nativePages.map(p=>{const b=p.getCropBox();return {left:b.x,bottom:b.y,right:b.x+b.width,top:b.y+b.height}}),forms=await doc.embedPages(nativePages,boxes),copier=PDFObjectCopier.for(input.context,doc.context),formByIndex=new Map(nativeIndexes.map((index,j)=>[index,forms[j]]));
+  for(let i=0;i<pages.length;i++){const form=formByIndex.get(i);if(form){await form.embed();const stream=doc.context.lookup(form.ref,PDFRawStream),group=pages[i].node.get(PDFName.of('Group'));stream.dict.set(PDFName.of('Group'),group?copier.copy(group):doc.context.obj({S:'Transparency',I:true,CS:'DeviceRGB'}))}embedded.set(sourceId+':'+(indexes[i]+1),{form,crop:pages[i].getCropBox(),rotation:pages[i].getRotation().angle,annotationCopier:copier,input,sourceId,pageNumber:indexes[i]+1,annotations:flattened.annotations[i],fallback:flattened.fallback.has(i)})}
  }
  const [mmW,mmH]=paperMM||[project.width*25.4/96,project.height*25.4/96],pw=mmW*72/25.4,ph=mmH*72/25.4;
- let rasterized=0;
+ let rasterized=0;const annotationJobs=[],targets=new Map();
  for(let i=0;i<prepared.length;i++){
-  onProgress?.(i+1,prepared.length);const sc=project.screens[i],box=pageBox(project,sc),[pageW,pageH]=box.points||((sc.canvasWidth&&[sc.canvasWidth,sc.canvasHeight].some((v,j)=>v!==[project.width,project.height][j]))?[box.width*.75,box.height*.75]:[pw,ph]),page=doc.addPage([pageW,pageH]);page.drawRectangle({x:0,y:0,width:pageW,height:pageH,color:rgb(1,1,1)});page.pushOperators(pushGraphicsState(),concatTransformationMatrix(pageW/box.width,0,0,pageH/box.height,-box.x*pageW/box.width,box.y*pageH/box.height));clipBox(page,box.x,-box.y,box.width,box.height);
-  const bg=sc.background;if(bg?.visible){if(bg.pdf){const item=embedded.get(bg.pdf.sourceId+':'+bg.pdf.pageNumber);page.drawPage(item.form,backgroundPlacement(bg,bg.pdf,item.crop,item.rotation,box.height))}else{const image=await imageFor(bg.src);const fit=Math.min(bg.w/image.width,bg.h/image.height),w=image.width*fit,h=image.height*fit;page.drawImage(image,{x:bg.x+(bg.w-w)/2,y:box.height-bg.y-(bg.h-h)/2-h,width:w,height:h,opacity:bg.opacity})}}
+  onProgress?.(i+1,prepared.length);const sc=project.screens[i],box=pageBox(project,sc),[pageW,pageH]=box.points||((sc.canvasWidth&&[sc.canvasWidth,sc.canvasHeight].some((v,j)=>v!==[project.width,project.height][j]))?[box.width*.75,box.height*.75]:[pw,ph]),sourceItem=sc.background?.visible&&sc.background.pdf?embedded.get(sc.background.pdf.sourceId+':'+sc.background.pdf.pageNumber):null,angle=sourceItem?((sourceItem.rotation%360)+360)%360:0,mediaW=angle%180?pageH:pageW,mediaH=angle%180?pageW:pageH,page=doc.addPage([mediaW,mediaH]);if(angle)page.setRotation(degrees(angle));if(sourceItem){const key=sourceItem.sourceId+':'+sourceItem.pageNumber;if(!targets.has(key))targets.set(key,{page,crop:sourceItem.crop});if(sourceItem.annotations.length)annotationJobs.push({...sourceItem,items:sourceItem.fallback?sourceItem.annotations.filter(a=>a.dict.get(PDFName.of('Subtype'))?.toString()==='/Link'):sourceItem.annotations,page})}page.drawRectangle({x:0,y:0,width:mediaW,height:mediaH,color:rgb(1,1,1)});page.pushOperators(pushGraphicsState(),concatTransformationMatrix(...inversePageRotation(angle,mediaW,mediaH)),concatTransformationMatrix(pageW/box.width,0,0,pageH/box.height,-box.x*pageW/box.width,box.y*pageH/box.height));clipBox(page,box.x,-box.y,box.width,box.height);
+  const bg=sc.background;if(bg?.visible){if(bg.pdf){const item=embedded.get(bg.pdf.sourceId+':'+bg.pdf.pageNumber);if(item.fallback){if(!renderBackground)throw Error('フォームの表示固定処理を使用できません');const image=await imageFor(await renderBackground(project.pdfSources[bg.pdf.sourceId],bg.pdf.pageNumber,bg.pdf));const fit=Math.min(bg.w/bg.pdf.pageWidth,bg.h/bg.pdf.pageHeight),w=bg.pdf.pageWidth*fit,h=bg.pdf.pageHeight*fit;page.drawImage(image,{x:bg.x+(bg.w-w)/2,y:box.height-bg.y-(bg.h-h)/2-h,width:w,height:h,opacity:bg.opacity});backgroundFallbacks++}else page.drawPage(item.form,backgroundPlacement(bg,bg.pdf,item.crop,item.rotation,box.height))}else{const image=await imageFor(bg.src);const fit=Math.min(bg.w/image.width,bg.h/image.height),w=image.width*fit,h=image.height*fit;page.drawImage(image,{x:bg.x+(bg.w-w)/2,y:box.height-bg.y-(bg.h-h)/2-h,width:w,height:h,opacity:bg.opacity})}}
   for(const e of prepared[i].elements){
    const bottom=box.height-e.y-e.h;
    if(e.paths){page.pushOperators(pushGraphicsState(),setLineJoin(LineJoinStyle.Round));for(const path of e.paths){const fill=path.fill?.[3]>0?color(path.fill):undefined,stroke=path.stroke?.[3]>0&&path.width>0?color(path.stroke):undefined;if(fill||stroke)page.drawSvgPath(path.d,{x:e.x,y:box.height-e.y,scale:1,color:fill,borderColor:stroke,borderWidth:stroke?path.width:0,opacity:path.fill?.[3]??1,borderOpacity:(path.stroke?.[3]??1)*path.strokeOpacity,borderLineCap:LineCapStyle.Round})}page.pushOperators(popGraphicsState())}
@@ -48,6 +50,7 @@ export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onPro
   }
   page.pushOperators(popGraphicsState(),popGraphicsState());
  }
- return {bytes:await doc.save({useObjectStreams:false}),rasterized};
+ for(const job of annotationJobs){const result=preserveAnnotations(job,targets);preservedAnnotations+=result.count;omittedLinks+=result.omittedLinks}
+ return {bytes:await doc.save({useObjectStreams:false}),rasterized,flattenedForms,backgroundFallbacks,preservedAnnotations,omittedLinks};
 }
 async function embedImage(doc,src){if(/^data:image\/jpe?g;/i.test(src))return doc.embedJpg(src);return doc.embedPng(src)}

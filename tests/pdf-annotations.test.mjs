@@ -1,0 +1,30 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {PDFDocument,PDFName,PDFString,PDFArray,PDFDict,PDFNumber,degrees,rgb} from 'pdf-lib';
+import {composeVectorPDF} from '../src/pdf-vector-core.mjs';
+import {inversePageRotation} from '../src/pdf-annotations.mjs';
+const N=PDFName.of;
+function note(bytes,metas){return {width:600,height:800,pdfSources:{src:Buffer.from(bytes).toString('base64')},screens:metas.map((m,i)=>({id:'s'+i,name:'p'+i,elements:[],background:{x:0,y:0,w:m[0],h:m[1],visible:true,opacity:1,pdf:{sourceId:'src',pageNumber:i+1,pageWidth:m[0],pageHeight:m[1]}}}))}}
+test('comments and external/internal links survive crop offsets and rotated output pages',async()=>{
+ const input=await PDFDocument.create(),a=input.addPage([400,600]),b=input.addPage([400,600]);a.setCropBox(20,30,300,500);a.setRotation(degrees(90));a.drawRectangle({x:20,y:30,width:300,height:500,color:rgb(1,1,1)});b.drawText('target');const refs=[input.context.register(input.context.obj({Type:'Annot',Subtype:'Text',Rect:[40,60,60,80],Contents:PDFString.of('review comment')})),input.context.register(input.context.obj({Type:'Annot',Subtype:'Link',Rect:[80,100,160,120],A:{S:'URI',URI:PDFString.of('https://example.com/')}})),input.context.register(input.context.obj({Type:'Annot',Subtype:'Link',Rect:[80,130,160,150],Dest:[b.ref,N('XYZ'),50,500,null]}))];a.node.set(N('Annots'),input.context.obj(refs));
+ const p=note(await input.save(),[[500,300],[400,600]]),result=await composeVectorPDF(p,[{elements:[]},{elements:[]}]),out=await PDFDocument.load(result.bytes),page=out.getPage(0),annots=page.node.Annots();assert.equal(annots.size(),3);assert.equal(page.getRotation().angle,90);assert.deepEqual(page.getSize(),{width:300,height:500});const comment=out.context.lookup(annots.get(0),PDFDict);assert.equal(comment.lookup(N('Contents')).decodeText(),'review comment');assert.deepEqual(comment.lookup(N('Rect'),PDFArray).asArray().map(n=>n.asNumber()),[20,30,40,50]);const link=out.context.lookup(annots.get(1),PDFDict).lookup(N('A'),PDFDict);assert.equal(link.lookup(N('URI')).decodeText(),'https://example.com/');const dest=out.context.lookup(annots.get(2),PDFDict).lookup(N('Dest'),PDFArray);assert.equal(dest.get(0).toString(),out.getPage(1).ref.toString());assert.equal(result.omittedLinks,0);
+});
+test('filled form values are flattened into page content while link annotations remain clickable',async()=>{
+ const input=await PDFDocument.create(),page=input.addPage([400,600]);page.drawText('original vectors');const form=input.getForm(),field=form.createTextField('note');field.setText('APPROVED 123');field.addToPage(page,{x:30,y:400,width:200,height:30});const box=form.createCheckBox('checked');box.addToPage(page,{x:40,y:300,width:20,height:20});box.check();form.updateFieldAppearances();page.node.addAnnot(input.context.register(input.context.obj({Type:'Annot',Subtype:'Link',Rect:[0,0,50,20],A:{S:'URI',URI:PDFString.of('https://example.com/')}})));
+ const result=await composeVectorPDF(note(await input.save(),[[400,600]]),[{elements:[]}]),out=await PDFDocument.load(result.bytes);assert.equal(out.getForm().getFields().length,0);assert.equal(out.getPage(0).node.Annots().size(),1);assert.equal(result.flattenedForms,2);assert.equal(result.backgroundFallbacks,0);
+});
+test('orphan widgets use a visual fallback without dropping links or blocking export',async()=>{
+ const input=await PDFDocument.create(),page=input.addPage([300,400]);page.drawText('background');page.node.addAnnot(input.context.register(input.context.obj({Type:'Annot',Subtype:'Widget',Rect:[10,10,80,30],FT:'Tx',V:PDFString.of('orphan')})));let calls=0;const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+ const result=await composeVectorPDF(note(await input.save(),[[300,400]]),[{elements:[]}],{renderBackground:async()=>{calls++;return png}});assert.equal(calls,1);assert.equal(result.backgroundFallbacks,1);assert((await PDFDocument.load(result.bytes)).getPageCount()===1);
+});
+test('inverse quarter-turn transforms retain native annotation coordinates',()=>{assert.deepEqual(inversePageRotation(90,300,500),[0,1,-1,0,300,0]);assert.deepEqual(inversePageRotation(270,300,500),[0,-1,1,0,0,500])});
+
+test('a text field missing its appearance can regenerate Japanese values before flattening',async()=>{
+ const {readFile}=await import('node:fs/promises'),{gunzipSync}=await import('node:zlib'),input=await PDFDocument.create(),page=input.addPage([400,600]),form=input.getForm(),field=form.createTextField('japanese');field.addToPage(page,{x:30,y:400,width:250,height:30});field.setText('承認済み');for(const widget of field.acroField.getWidgets())widget.dict.delete(N('AP'));const source=await input.save({updateFieldAppearances:false});let calls=0;
+ const result=await composeVectorPDF(note(source,[[400,600]]),[{elements:[]}],{sourceFontBytes:async()=>{calls++;return gunzipSync(await readFile('assets/KaigiNoteSansJP.ttf.gz'))}});assert.equal(calls,1);assert.equal(result.backgroundFallbacks,0);assert.equal(result.flattenedForms,1);assert.equal((await PDFDocument.load(result.bytes)).getForm().getFields().length,0);
+ const {DOMMatrix,Path2D,ImageData}=await import('@napi-rs/canvas');globalThis.DOMMatrix??=DOMMatrix;globalThis.Path2D??=Path2D;globalThis.ImageData??=ImageData;const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs'),task=pdfjs.getDocument({data:new Uint8Array(result.bytes)});try{const pdf=await task.promise,text=await(await pdf.getPage(1)).getTextContent();assert(text.items.map(i=>i.str).join('').includes('承認済み'))}finally{await task.destroy()}
+});
+
+test('unsupported form data without widgets still requests the displayed-page fallback',async()=>{
+ const {flattenSourceForms}=await import('../src/pdf-annotations.mjs'),input=await PDFDocument.create(),page=input.addPage([300,400]);input.catalog.set(N('AcroForm'),input.context.obj({Fields:[],XFA:PDFString.of('unsupported')}));const result=await flattenSourceForms(input,[page]);assert(result.fallback.has(0));
+});

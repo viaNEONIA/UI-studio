@@ -9,11 +9,14 @@ export async function enterEditor(page){
 export async function expandEditorPanels(page){await enterEditor(page);await page.locator('aside details').evaluateAll(nodes=>nodes.forEach(n=>n.open=true))}
 
 // Confirm the new shape placement flow in existing editing regressions.
-export async function placePendingObject(page){
+export async function placePendingObject(page,center){
  if(!await page.locator('#device').getAttribute('data-placement'))return;
- const rect=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());
- const size=await page.locator('#device').evaluate(n=>[n.clientWidth,n.clientHeight]);
- await page.mouse.click(rect.x+(size[0]/2+2)*z,rect.y+(size[1]/2+2)*z);await page.keyboard.press('Enter');
+ const rect=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue()),size=await page.locator('#device').evaluate(n=>[n.clientWidth,n.clientHeight]),cx=center?.x??size[0]/2,cy=center?.y??size[1]/2;
+ await page.mouse.move(rect.x+(cx+2)*z,rect.y+(cy+2)*z);const kind=await page.locator('#device').getAttribute('data-placement-kind'),preview=page.locator('.placement-preview'),dimensions=await preview.evaluate(n=>({w:parseFloat(n.style.width),h:parseFloat(n.style.height)}));
+ if(kind==='box'){await page.mouse.click(rect.x+(cx-dimensions.w/2+2)*z,rect.y+(cy-dimensions.h/2+2)*z);await page.mouse.click(rect.x+(cx+dimensions.w/2+2)*z,rect.y+(cy+dimensions.h/2+2)*z)}
+ else if(kind==='circle'){await page.mouse.click(rect.x+(cx+2)*z,rect.y+(cy+2)*z);await page.mouse.move(rect.x+(cx+dimensions.w/2+2)*z,rect.y+(cy+2)*z);await page.mouse.click(rect.x+(cx+dimensions.w/2+2)*z,rect.y+(cy+2)*z)}
+ else await page.mouse.click(rect.x+(cx+2)*z,rect.y+(cy+2)*z);
+ await page.keyboard.press('Enter');
 }
 
 // Legacy geometry regressions explicitly confirm the two clicks that used to
@@ -23,9 +26,14 @@ export async function confirmTwoPointDraft(page){
  if(['line','arrow','guide'].includes(type)&&await page.locator('#finishDrawing').isEnabled())await page.keyboard.press('Enter');
 }
 export async function freezePendingPlacement(page){
- const type=await page.locator('#device').getAttribute('data-drawing-type');
- if(['placement','axisGuide'].includes(type)&&!await page.locator('#finishDrawing').isEnabled()){await page.mouse.down();await page.mouse.up()}
+ const type=await page.locator('#device').getAttribute('data-drawing-type');if(!['placement','axisGuide'].includes(type)||await page.locator('#finishDrawing').isEnabled())return;
+ const kind=await page.locator('#device').getAttribute('data-placement-kind'),phase=await page.locator('#device').getAttribute('data-placement-phase');
+ if(['box','circle'].includes(kind)&&phase==='origin'){
+  if(!await page.locator('.placement-preview').count())return;const b=await page.locator('.placement-preview').boundingBox();if(!b)return;
+  if(kind==='box'){await page.mouse.click(b.x,b.y);await page.mouse.click(b.x+b.width,b.y+b.height)}else{await page.mouse.click(b.x+b.width/2,b.y+b.height/2);await page.mouse.move(b.x+b.width,b.y+b.height/2);await page.mouse.click(b.x+b.width,b.y+b.height/2)}
+ }else{await page.mouse.down();await page.mouse.up()}
 }
+
 export async function placeDefaultLine(page){
  const type=await page.locator('#device').getAttribute('data-drawing-type');if(!['line','arrow','polyline','curve'].includes(type))return;
  const d=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue()),size=await page.locator('#device').evaluate(n=>[n.clientWidth,n.clientHeight]),cx=size[0]/2,cy=size[1]/2,curved=['polyline','curve'].includes(type),pts=curved?[[cx-120,cy+60],[cx,cy-60],[cx+120,cy+60]]:[[cx-120,cy-40],[cx+120,cy+40]];
