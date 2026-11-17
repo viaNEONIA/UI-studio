@@ -31,7 +31,7 @@ function editorContext(){
  const ctx=vm.createContext({project,screenId:'s',drawing:null,viewOnly:false,Math,Number,Set,Error,uid:()=>String(++counter),screen:()=>project.screens[0],snapshot(){},render(){},showDrawing(){},tell(){},applyDefaultProperties(){},multi:new Set()});
  const t=html.indexOf('const types='),te=html.indexOf(';let drawing',t);vm.runInContext(html.slice(t,te)+';',ctx);
  const d=html.indexOf('const defaults='),de=html.indexOf(';function makeObject',d);vm.runInContext(html.slice(d,de)+';',ctx);
- for(const name of ['isLine','isShape','makeObject','midpoint','drawingNeedsReference','placementPoint','positionPlacement','finishDrawing'])vm.runInContext(fn(name),ctx);
+ for(const name of ['isLine','isShape','makeObject','midpoint','drawingNeedsReference','placementPoint','canFinishDrawing','positionPlacement','finishDrawing'])vm.runInContext(fn(name),ctx);
  return ctx;
 }
 test('all line and shape factories use red 2px and shapes start with transparent fills',()=>{
@@ -41,7 +41,7 @@ test('line completion starts an independent next object and empty Enter does not
  const ctx=editorContext();for(const type of ['line','arrow','polyline','curve']){ctx.drawing={type,screenId:'s',points:[[30,40],[140,180]]};ctx.finishDrawing();assert.equal(ctx.drawing.type,type);assert.equal(ctx.drawing.points.length,0);const count=ctx.project.screens[0].elements.length;ctx.finishDrawing();assert.equal(ctx.project.screens[0].elements.length,count)}
 });
 test('placement commits around cursor center and does not commit without a canvas position',()=>{
- const ctx=editorContext(),object=ctx.makeObject('box');ctx.drawing={type:'placement',object,screenId:'s',cursor:null,points:[]};ctx.finishDrawing();assert.equal(ctx.project.screens[0].elements.length,0);ctx.drawing.cursor=[220,250];ctx.finishDrawing();assert.equal(object.x+object.w/2,220);assert.equal(object.y+object.h/2,250);assert.equal(ctx.project.screens[0].elements.length,1);assert.equal(ctx.drawing,null);
+ const ctx=editorContext(),object=ctx.makeObject('box');ctx.drawing={type:'placement',object,screenId:'s',cursor:null,points:[]};ctx.finishDrawing();assert.equal(ctx.project.screens[0].elements.length,0);ctx.drawing.cursor=[220,250];ctx.finishDrawing();assert.equal(ctx.project.screens[0].elements.length,0);ctx.drawing.fixedPoint=[220,250];ctx.finishDrawing();assert.equal(object.x+object.w/2,220);assert.equal(object.y+object.h/2,250);assert.equal(ctx.project.screens[0].elements.length,1);assert.equal(ctx.drawing,null);
 });
 vm.runInContext(fn('satisfiesAngleConstraint'),context);
 vm.runInContext(fn('segmentSnapPoint'),context);

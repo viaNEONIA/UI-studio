@@ -1,9 +1,10 @@
+import {confirmTwoPointDraft,freezePendingPlacement} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function point(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());return {x:r.x+(x+2)*z,y:r.y+(y+2)*z}}
-async function clickPoint(page,x,y){const p=await point(page,x,y);await page.mouse.click(p.x,p.y)}
+async function clickPoint(page,x,y){const p=await point(page,x,y);await page.mouse.click(p.x,p.y);await confirmTwoPointDraft(page)}
 async function movePoint(page,x,y){const p=await point(page,x,y);await page.mouse.move(p.x,p.y,{steps:8})}
 async function lockAngle(page,angle){await page.locator('#angleValue').fill(String(angle));await page.locator('#angleLock').check()}
 const world=e=>e.points.map(([x,y])=>[e.x+x*e.w,e.y+y*e.h]);
@@ -20,7 +21,7 @@ test('angle lock switches off, Shift overrides it and Ctrl only snaps to compati
  await page.locator('#angleLock').uncheck();await page.locator('#drawLine').click();await clickPoint(page,40,40);await clickPoint(page,200,90);const free=world((await saved(page)).screens[0].elements[3]);expect(free[0][0]).toBeCloseTo(40);expect(free[0][1]).toBeCloseTo(40);expect(free[1][0]).toBeCloseTo(200);expect(free[1][1]).toBeCloseTo(90);
 });
 test('polyline segments, guide creation and control-point drag maintain the chosen angle',async({page})=>{
- await lockAngle(page,30);await page.locator('#drawPolyline').click();await clickPoint(page,40,50);await clickPoint(page,160,140);await clickPoint(page,300,220);await page.keyboard.press('Enter');let p=await saved(page),pts=world(p.screens[0].elements[0]);expectAngle(pts[0],pts[1],30);expectAngle(pts[1],pts[2],30);await page.keyboard.press('Escape');const h=await page.locator('.vertex').last().boundingBox();await page.mouse.move(h.x+h.width/2,h.y+h.height/2);await page.mouse.down();await movePoint(page,340,300);await page.mouse.up();pts=world((await saved(page)).screens[0].elements[0]);expectAngle(pts[1],pts[2],60);
+ await lockAngle(page,30);await page.locator('#drawPolyline').click();await clickPoint(page,40,50);await clickPoint(page,160,140);await clickPoint(page,300,220);await freezePendingPlacement(page);await page.keyboard.press('Enter');let p=await saved(page),pts=world(p.screens[0].elements[0]);expectAngle(pts[0],pts[1],30);expectAngle(pts[1],pts[2],30);await page.keyboard.press('Escape');const h=await page.locator('.vertex').last().boundingBox();await page.mouse.move(h.x+h.width/2,h.y+h.height/2);await page.mouse.down();await movePoint(page,340,300);await page.mouse.up();pts=world((await saved(page)).screens[0].elements[0]);expectAngle(pts[1],pts[2],60);
  await page.locator('#drawGuide').click();await clickPoint(page,20,300);await clickPoint(page,300,500);const g=(await saved(page)).screens[0].guidelines[0];expectAngle([g.x,g.y],[g.x+g.dx,g.y+g.dy],30);
 });
 test('locked objects cannot be selected by canvas, layer list, modifiers or group, and unlock restores selection',async({page})=>{

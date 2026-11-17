@@ -1,9 +1,10 @@
+import {confirmTwoPointDraft} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {expandEditorPanels} from './editor-panels.mjs';
 async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
-async function clickPoint(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());await page.mouse.click(r.x+(x+2)*z,r.y+(y+2)*z)}
+async function clickPoint(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());await page.mouse.click(r.x+(x+2)*z,r.y+(y+2)*z);await confirmTwoPointDraft(page)}
 async function movePoint(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());await page.mouse.move(r.x+(x+2)*z,r.y+(y+2)*z,{steps:5})}
 function direction(e){const [a,b]=e.points.map(([x,y])=>[e.x+x*e.w,e.y+y*e.h]);return(Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI+360)%360}
 function expectDirection(actual,expected){expect(Math.abs(((actual-expected+540)%360)-180)).toBeLessThan(.001)}
