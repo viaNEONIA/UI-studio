@@ -19,9 +19,10 @@ export function textRunPlacement(run,font,metrics){
 
  return {sx,sy,x,y};
 }
-export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress,sourceFontBytes,renderBackground,mode='normal'}={}){
+export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress,sourceFontBytes,renderBackground,mode='normal',author=project.pdfOptions?.author??'会議ノート',exportedAt=new Date()}={}){
  if(!['normal','editable'].includes(mode))throw Error('PDF出力方式が正しくありません');
- const doc=await PDFDocument.create();doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(alignedFontkit);
+ if(typeof author!=='string'||author.length>200)throw Error('PDF作成者は200文字以内で指定してください');exportedAt=new Date(exportedAt);if(!Number.isFinite(exportedAt.getTime()))throw Error('PDF出力日時が不正です');
+ const doc=await PDFDocument.create();doc.setAuthor(author);doc.setCreationDate(exportedAt);doc.setModificationDate(exportedAt);doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(alignedFontkit);
  let font,metrics;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:true});metrics=fontkit.create(fontBytes);const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
  const images=new Map(),imageFor=src=>{if(!images.has(src))images.set(src,embedImage(doc,src));return images.get(src)};
  const embedded=new Map();let flattenedForms=0,backgroundFallbacks=0,preservedAnnotations=0,omittedLinks=0;
@@ -45,7 +46,7 @@ export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onPro
    const transform=annotationTransform(box,pageW,pageH,angle);
    for(const part of parts){const rect=annotationBounds(part.original,transform,mediaW,mediaH);if(!rect)continue;
     const temp=doc.addPage([mediaW,mediaH]);temp.pushOperators(pushGraphicsState(),concatTransformationMatrix(...inversePageRotation(angle,mediaW,mediaH)),concatTransformationMatrix(pageW/box.width,0,0,pageH/box.height,-box.x*pageW/box.width,box.y*pageH/box.height));clipBox(temp,box.x,-box.y,box.width,box.height);await drawElement(temp,part.prepared,box);temp.pushOperators(popGraphicsState(),popGraphicsState());
-    const appearance=await doc.embedPage(temp,{left:rect[0],bottom:rect[1],right:rect[2],top:rect[3]});await appearance.embed();doc.removePage(doc.getPageCount()-1);doc.context.delete(temp.ref);addEditableAnnotation({doc,page,...part,transform,rect,appearance,index:++editableAnnotations,font});
+    const appearance=await doc.embedPage(temp,{left:rect[0],bottom:rect[1],right:rect[2],top:rect[3]});await appearance.embed();doc.removePage(doc.getPageCount()-1);doc.context.delete(temp.ref);addEditableAnnotation({doc,page,...part,transform,rect,appearance,index:++editableAnnotations,font,author,exportedAt});
    }
   }
   page.pushOperators(popGraphicsState(),popGraphicsState());
