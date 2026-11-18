@@ -16,7 +16,7 @@ export async function placePendingObject(page,center){
  if(kind==='box'){await page.mouse.click(rect.x+(cx-dimensions.w/2+2)*z,rect.y+(cy-dimensions.h/2+2)*z);await page.mouse.click(rect.x+(cx+dimensions.w/2+2)*z,rect.y+(cy+dimensions.h/2+2)*z)}
  else if(kind==='circle'){await page.mouse.click(rect.x+(cx+2)*z,rect.y+(cy+2)*z);await page.mouse.move(rect.x+(cx+dimensions.w/2+2)*z,rect.y+(cy+2)*z);await page.mouse.click(rect.x+(cx+dimensions.w/2+2)*z,rect.y+(cy+2)*z)}
  else await page.mouse.click(rect.x+(cx+2)*z,rect.y+(cy+2)*z);
- await page.keyboard.press('Enter');
+ if(await page.locator('#device').getAttribute('data-drawing-type'))await page.keyboard.press('Enter');
 }
 
 // Legacy geometry regressions explicitly confirm the two clicks that used to
