@@ -16,12 +16,7 @@ const color=c=>c?rgb(c[0]/255,c[1]/255,c[2]/255):undefined;
 export function textRunPlacement(run,font,metrics){
  let sx=1,sy=1,x=run.x,y=-run.baseline;
  if(Number.isFinite(run.width)&&run.width>=0){const advance=font.widthOfTextAtSize(run.text,run.size);if(advance>0)sx=run.width/advance}
- const ink=run.ink;
- if(ink&&Object.values(ink).every(Number.isFinite)&&ink.left+ink.right>0&&ink.ascent+ink.descent>0){
-  const glyphs=metrics.layout(run.text).glyphs,unit=run.size/metrics.unitsPerEm;let pen=0,minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-  for(const glyph of glyphs){const b=glyph.bbox;if([b.minX,b.maxX,b.minY,b.maxY].every(Number.isFinite)){minX=Math.min(minX,pen+b.minX);maxX=Math.max(maxX,pen+b.maxX);minY=Math.min(minY,b.minY);maxY=Math.max(maxY,b.maxY)}pen+=glyph.advanceWidth}
-  if(maxX>minX&&maxY>minY){sx=(ink.left+ink.right)/((maxX-minX)*unit);sy=(ink.ascent+ink.descent)/((maxY-minY)*unit);x=run.x-ink.left-minX*unit*sx;y=-run.baseline-ink.descent-minY*unit*sy}
- }
+
  return {sx,sy,x,y};
 }
 export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onProgress,sourceFontBytes,renderBackground,mode='normal'}={}){

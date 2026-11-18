@@ -1,11 +1,13 @@
+import {expandCompoundProject} from './compound-objects.mjs';
 import {renderPDFRegion,planPDFRegion} from './pdf-background.mjs';
 import {composeVectorPDF} from './pdf-vector-core.mjs';
 import fontData from 'pdf-vector-font';
 let fontBytes,fontReady;
 async function bytes(){return fontBytes??=(async()=>{const compressed=Uint8Array.from(atob(fontData),c=>c.charCodeAt(0));return new Uint8Array(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())})()}
-async function font(){if(!fontReady){fontReady=(async()=>{const face=new FontFace('KaigiNotePDF',await bytes());await face.load();document.fonts.add(face)})();fontReady.catch(()=>{fontReady=null})}await fontReady}
+export async function font(){if(!fontReady){fontReady=(async()=>{const face=new FontFace('KaigiNotePDF',await bytes());await face.load();document.fonts.add(face)})();fontReady.catch(()=>{fontReady=null})}await fontReady}
 function rgba(value){if(!value||value==='none'||value==='transparent')return [0,0,0,0];const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d');ctx.fillStyle=value;ctx.fillRect(0,0,1,1);const p=[...ctx.getImageData(0,0,1,1).data];p[3]/=255;return p}
 export async function exportVectorPDF(project,{makeNode,raster,paperMM,onProgress,mode='normal'}){
+ project=expandCompoundProject(project);
  for(const sc of project.screens)for(const e of sc.elements){if(e.type==='html')throw Error('HTML部品を含むページのPDF出力には未対応です。HTMLまたはJSONで保存してください');if(e.css?.trim())throw Error('追加CSSがある部品はベクターPDFに対応していません: '+(e.name||e.type));if(e.type==='image'&&/^https?:/i.test(e.text))throw Error('PDF出力では外部画像URLを使用できません。背景画像として取り込んでください')}
  const hasText=project.screens.some(sc=>sc.elements.some(e=>['text','box','circle','triangle'].includes(e.type)&&e.text));if(hasText)await font();await document.fonts.ready;
  // Measure with the editor's typography. The embedded font must never reflow the layout.

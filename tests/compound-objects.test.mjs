@@ -1,0 +1,6 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {compoundChildren,expandObjects,objectTree,expandCompoundProject} from '../src/compound-objects.mjs';
+const compound={id:'p',type:'compound',x:100,y:200,w:200,h:120,compoundWidth:100,compoundHeight:60,children:[{id:'a',type:'text',x:0,y:0,w:40,h:20,text:'残す',font:18,pdfComment:'コメント'},{id:'b',type:'line',x:20,y:40,w:80,h:20,points:[[0,0],[1,1]],strokeWidth:2}]};
+test('compound expansion scales local positions and sizes while retaining editable content and styles',()=>{const expanded=expandObjects([compound]);assert.deepEqual(expanded.map(e=>[e.x,e.y,e.w,e.h]),[[100,200,80,40],[140,280,160,40]]);assert.equal(expanded[0].text,'残す');assert.equal(expanded[0].font,18);assert.equal(expanded[1].strokeWidth,2);assert.equal(expanded[0].pdfComment,'コメント');assert.equal(compoundChildren(compound)[0].x,0);assert.equal(objectTree([compound]).length,3);assert.equal(expandCompoundProject({screens:[{elements:[compound]}]}).screens[0].elements.length,2)});
+test('invalid or excessively nested compound data are rejected',()=>{assert.throws(()=>objectTree([{...compound,children:[]}]));assert.throws(()=>objectTree([{...compound,compoundWidth:0}]));let nested=compound;for(let i=0;i<12;i++)nested={...compound,children:[nested,compound.children[0]]};assert.throws(()=>objectTree([nested]))});
