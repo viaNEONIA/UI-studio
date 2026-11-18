@@ -587,7 +587,7 @@ let noteSaveHandle=null,activeShapeGestureEnd=null;
 async function manualSave(saveAs=false){
  syncObjectMetadata();const data=JSON.stringify(project,null,2);
  try{
-  if(window.showSaveFilePicker){if(saveAs)noteSaveHandle=null;noteSaveHandle??=await window.showSaveFilePicker({suggestedName:namedDownload('会議ノート.json'),types:[{description:'ノートデータ',accept:{'application/json':['.json']}}]});const writable=await noteSaveHandle.createWritable();try{await writable.write(data);await writable.close()}catch(error){await writable.abort().catch(()=>{});throw error}}
+  if(window.showSaveFilePicker){const handle=(!saveAs&&noteSaveHandle)||await window.showSaveFilePicker({suggestedName:namedDownload('会議ノート.json'),types:[{description:'ノートデータ',accept:{'application/json':['.json']}}]});const writable=await handle.createWritable();try{await writable.write(data);await writable.close();noteSaveHandle=handle}catch(error){await writable.abort().catch(()=>{});throw error}}
   else download('会議ノート.json',data,'application/json');
   if(recoveryDB){clearTimeout(saveTimer);backupPending=data;await writeBackup()}tell('ノートを手動保存しました');
  }catch(error){if(error.name!=='AbortError')tell('保存できませんでした: '+error.message)}
