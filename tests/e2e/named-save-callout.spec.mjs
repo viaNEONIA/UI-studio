@@ -11,7 +11,8 @@ async function callout(page){await page.locator('#quickCallout').click();await a
 test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page);await load(page)});
 test('one filename field names every export and retains the base name on reload',async({page})=>{
  await page.locator('#saveFileName').fill('設備打合せ.pdf');await page.locator('#saveFileName').blur();
- for(const [id,name]of [['saveJson','設備打合せ.json'],['exportHtml','設備打合せ-閲覧用.html'],['exportPng','設備打合せ-ページ-1.png'],['exportPdf','設備打合せ.pdf'],['exportPptx','設備打合せ.pptx'],['backupZip','設備打合せ-バックアップ.zip'],['exportPropertyPresets','設備打合せ-プロパティ設定.json']]){const saved=await save(page,id);expect(saved.name).toBe(name);expect(saved.bytes.length).toBeGreaterThan(10)}
+ for(const [id,name]of [['saveJson','設備打合せ.json'],['exportHtml','設備打合せ-閲覧用.html'],['exportPng','設備打合せ-ページ-1.png'],['exportPdf','設備打合せ.pdf'],['exportPptx','設備打合せ.pptx'],['backupZip','設備打合せ-バックアップ.zip']]){const saved=await save(page,id);expect(saved.name).toBe(name);expect(saved.bytes.length).toBeGreaterThan(10)}
+ await page.locator('#quickText').click();await at(page,350,350,true);await page.keyboard.press('Enter');await page.locator('#propertyPresetName').fill('文字設定');await page.locator('#savePropertyPreset').click();expect((await save(page,'exportPropertyPresets')).name).toBe('設備打合せ-プロパティ設定.json');
  const before=await note(page);await load(page,before);await expect(page.locator('#saveFileName')).toHaveValue('設備打合せ.pdf');await page.locator('#pdfExportMode').selectOption('editable');expect((await save(page,'exportPdf')).name).toBe('設備打合せ-注釈編集用.pdf');
  await page.locator('#saveFileName').fill('設備/確認:資料.json');expect((await save(page)).name).toBe('設備_確認_資料.json');
 });

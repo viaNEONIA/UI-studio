@@ -754,7 +754,7 @@ function syncObjectMetadata(){
  if(metadataProject!==project){objectMetadata.clear();metadataProject=project}const now=new Date().toISOString(),present=new Set();
  for(const sc of project.screens)for(const e of objectTree(sc.elements)){
   present.add(e.id);const {createdAt,updatedAt,...values}=e,signature=JSON.stringify(values),before=objectMetadata.get(e.id);
-  if(before&&before.signature!==signature){e.createdAt??=now;e.updatedAt=now}
+  if(before&&before.signature!==signature){e.updatedAt=now}
   objectMetadata.set(e.id,{signature});
  }
  for(const id of objectMetadata.keys())if(!present.has(id))objectMetadata.delete(id);
