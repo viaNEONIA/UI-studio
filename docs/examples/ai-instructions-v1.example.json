@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "1.0.0",
+  "document": {
+    "sourceFile": "meeting-slide.html",
+    "sourceType": "html",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    }
+  },
+  "slides": [
+    {
+      "id": "slide-1",
+      "name": "操作画面",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "instructions": [
+    {
+      "id": "instruction-1",
+      "slideId": "slide-1",
+      "action": "move",
+      "text": "保存ボタンを画面右下へ移動し、他のボタンと16pxの間隔を確保する。",
+      "target": {
+        "elementId": "save-button",
+        "selector": "#save-button",
+        "bounds": {
+          "x": 1180,
+          "y": 48,
+          "width": 120,
+          "height": 48
+        }
+      },
+      "annotations": [
+        {
+          "id": "annotation-1",
+          "kind": "rectangle",
+          "bounds": {
+            "x": 1170,
+            "y": 38,
+            "width": 140,
+            "height": 68
+          },
+          "color": "#ff0000"
+        },
+        {
+          "id": "annotation-2",
+          "kind": "callout",
+          "bounds": {
+            "x": 900,
+            "y": 100,
+            "width": 300,
+            "height": 100
+          },
+          "label": "右下へ移動",
+          "color": "#ff0000"
+        }
+      ]
+    }
+  ]
+}
