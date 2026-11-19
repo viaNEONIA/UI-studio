@@ -54,6 +54,8 @@ Issue #24の「PDF・PowerPointでの編集」を1項目で完了扱いにする
 
 **状態：** 仕様検討段階。HTML読込・注釈編集・AI向けJSON出力はいずれも未実装。実装時期は未定。
 
+AI向けJSONの設計案は[仕様書](AI_INSTRUCTIONS_JSON.md)、[JSON Schema](schemas/ai-instructions-v1.schema.json)、[サンプル](examples/ai-instructions-v1.example.json)に記録しました。**仕様のみで、アプリへの実装は未着手です。**
+
 ## 残っている実装予定
 
 - フロー図専用ツールパレット。
