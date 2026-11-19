@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/viaNEONIA/UI-studio/blob/main/docs/schemas/ai-instructions-v1.schema.json",
+  "title": "Kaigi Note AI Instructions v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "document",
+    "slides",
+    "instructions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFile",
+        "sourceType"
+      ],
+      "properties": {
+        "sourceFile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceType": {
+          "const": "html"
+        },
+        "sourceHash": {
+          "type": "string",
+          "description": "Optional SHA-256 digest of original HTML"
+        },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height"
+          ],
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "slides": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "height": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "instructions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "slideId",
+          "action",
+          "text",
+          "annotations",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "slideId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "enum": [
+              "modify",
+              "move",
+              "resize",
+              "add",
+              "remove",
+              "replace",
+              "review"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "elementId": {
+                "type": "string"
+              },
+              "selector": {
+                "type": "string"
+              },
+              "textHint": {
+                "type": "string"
+              },
+              "bounds": {
+                "$ref": "#/$defs/rect"
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "elementId"
+                ]
+              },
+              {
+                "required": [
+                  "selector"
+                ]
+              },
+              {
+                "required": [
+                  "textHint"
+                ]
+              },
+              {
+                "required": [
+                  "bounds"
+                ]
+              }
+            ]
+          },
+          "annotations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "kind",
+                "bounds"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "enum": [
+                    "rectangle",
+                    "ellipse",
+                    "line",
+                    "arrow",
+                    "text",
+                    "callout",
+                    "freehand",
+                    "other"
+                  ]
+                },
+                "bounds": {
+                  "$ref": "#/$defs/rect"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
