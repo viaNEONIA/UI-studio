@@ -13,6 +13,6 @@ export function substituteProject(project,available){
  copy.screens.forEach((sc,i)=>walk(sc.elements,sc,i));return {project:copy,replacements};
 }
 export function replacementReport(replacements,pdfName){
- const count=new Set(replacements.map(r=>r.original)).size;
- return '\ufeff'+['会議ノート PDF文字置換一覧','対象PDF：'+pdfName,'未収録文字：'+count+'種類・'+replacements.length+'箇所','元のノート・JSON・ZIPの文字は変更していません。','',...replacements.map((r,i)=>[`${i+1}. ${r.page}ページ「${r.pageName}」 / ${r.objectName} (${r.objectId})`,`元文字：${r.original} → ${r.replacement} / ${r.unicode}`,`同じ文字の出現数：${replacements.filter(v=>v.original===r.original).length}`,`文字位置：${r.index+1} / 前後：${JSON.stringify(r.context)}`,''].join('\r\n'))].join('\r\n');
+ const counts=new Map();for(const r of replacements)counts.set(r.original,(counts.get(r.original)||0)+1);const count=counts.size;
+ return '\ufeff'+['会議ノート PDF文字置換一覧','対象PDF：'+pdfName,'未収録文字：'+count+'種類・'+replacements.length+'箇所','元のノート・JSON・ZIPの文字は変更していません。','',...replacements.map((r,i)=>[`${i+1}. ${r.page}ページ「${r.pageName}」 / ${r.objectName} (${r.objectId})`,`元文字：${r.original} → ${r.replacement} / ${r.unicode}`,`同じ文字の出現数：${counts.get(r.original)}`,`文字位置：${r.index+1} / 前後：${JSON.stringify(r.context)}`,''].join('\r\n'))].join('\r\n');
 }
