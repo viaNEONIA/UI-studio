@@ -21,4 +21,4 @@ Acrobat実機確認は未実施です。対策実装済みでも、Acrobatで解
 
 ## 検証
 
-ローカル単体80件成功。ローカルChromiumはsocket制約で起動できないため、操作テストはPRのGitHub Actionsで実行します。CI結果はPR本文に記録します。
+ローカル単体81件成功。ローカルChromiumはsocket制約で起動できないため、操作テストはPRのGitHub Actionsで実行します。CI結果はPR本文に記録します。
