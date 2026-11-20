@@ -1,3 +1,5 @@
+import fontkit from '@pdf-lib/fontkit';
+import {substituteProject} from './pdf-text-fallback.mjs';
 import {expandCompoundProject} from './compound-objects.mjs';
 import {renderPDFRegion,planPDFRegion} from './pdf-background.mjs';
 import {composeVectorPDF} from './pdf-vector-core.mjs';
@@ -9,7 +11,7 @@ function rgba(value){if(!value||value==='none'||value==='transparent')return [0,
 export async function exportVectorPDF(project,{makeNode,raster,paperMM,onProgress,mode='normal'}){
  project=expandCompoundProject(project);
  for(const sc of project.screens)for(const e of sc.elements){if(e.type==='html')throw Error('HTML部品を含むページのPDF出力には未対応です。HTMLまたはJSONで保存してください');if(e.css?.trim())throw Error('追加CSSがある部品はベクターPDFに対応していません: '+(e.name||e.type));if(e.type==='image'&&/^https?:/i.test(e.text))throw Error('PDF出力では外部画像URLを使用できません。背景画像として取り込んでください')}
- const hasText=project.screens.some(sc=>sc.elements.some(e=>['text','box','circle','triangle'].includes(e.type)&&e.text));if(hasText)await font();await document.fonts.ready;
+ const hasText=project.screens.some(sc=>sc.elements.some(e=>['text','box','circle','triangle'].includes(e.type)&&e.text));let replacements=[];if(hasText){await font();const sanitized=substituteProject(project,new Set(fontkit.create(await bytes()).characterSet));project=sanitized.project;replacements=sanitized.replacements}await document.fonts.ready;
  // Measure with the editor's typography. The embedded font must never reflow the layout.
  const typography=getComputedStyle(document.querySelector('#device')||document.documentElement),host=document.createElement('div');host.style.cssText='position:fixed;left:0;top:0;z-index:-100;pointer-events:none;';for(const key of ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight','letterSpacing','wordSpacing','fontKerning','fontVariantLigatures'])host.style[key]=typography[key];host.className='export-page';host.style.width=project.width+'px';host.style.height=project.height+'px';document.body.append(host);
  const prepared=[];
@@ -26,14 +28,14 @@ export async function exportVectorPDF(project,{makeNode,raster,paperMM,onProgres
       }
      }
     }
-   }else if(e.type==='image'&&/^data:image\/(png|jpeg|jpg);/i.test(e.text)){out.image=e.text;out.cover=true}
+   }else if(e.type==='image'&&/^data:image\/(png|jpeg|jpg);/i.test(e.text)){out.image=e.text;out.cover=true;out.opacity=e.imageOpacity??1}
    else{
     const tile=document.createElement('div');tile.style.cssText=`position:fixed;left:0;top:0;width:${e.w}px;height:${e.h}px;background:transparent;font-family:system-ui;z-index:-100;`;node.style.left=node.style.top='0px';node.remove();tile.append(node);document.body.append(tile);try{out.image=await raster(tile,e.w,e.h,{transparent:true});out.rasterized=true}finally{tile.remove()}
    }
    elements.push(out);
   }finally{node.remove()}}
   prepared.push({elements})}
-  const result=await composeVectorPDF(project,prepared,{fontBytes:hasText?await bytes():undefined,paperMM,onProgress,sourceFontBytes:bytes,mode,renderBackground:async(source,pageNumber,meta)=>{const b={x:0,y:0,w:meta.pageWidth*96/72,h:meta.pageHeight*96/72},plan=planPDFRegion(meta,b,{x:0,y:0,width:b.w,height:b.h},3),canvas=document.createElement('canvas');try{await renderPDFRegion(source,pageNumber,plan,canvas);return canvas.toDataURL('image/png')}finally{canvas.width=canvas.height=0}}});return {...result,blob:new Blob([result.bytes],{type:'application/pdf'}),rasterized:result.rasterized};
- }catch(error){if(/cannot encode|glyph|font|subset/i.test(error.message))throw Error('PDF用フォントに含まれない文字・記号があるか、フォント処理に失敗しました。文字を変更してください: '+error.message);throw error}
+  const result=await composeVectorPDF(project,prepared,{fontBytes:hasText?await bytes():undefined,paperMM,onProgress,sourceFontBytes:bytes,mode,renderBackground:async(source,pageNumber,meta)=>{const b={x:0,y:0,w:meta.pageWidth*96/72,h:meta.pageHeight*96/72},plan=planPDFRegion(meta,b,{x:0,y:0,width:b.w,height:b.h},3),canvas=document.createElement('canvas');try{await renderPDFRegion(source,pageNumber,plan,canvas);return canvas.toDataURL('image/png')}finally{canvas.width=canvas.height=0}}});return {...result,replacements,blob:new Blob([result.bytes],{type:'application/pdf'}),rasterized:result.rasterized};
+ }catch(error){if(/cannot encode|glyph|font|subset/i.test(error.message))throw Error('PDF用フォントの処理に失敗しました（未収録文字の置換とは別のエラーです）: '+error.message);throw error}
  finally{host.remove()}
 }

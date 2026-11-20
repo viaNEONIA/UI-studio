@@ -19,8 +19,9 @@ test('embedded original pages retain vector content and rotated crop boxes',asyn
  const src=await PDFDocument.create(),p=src.addPage([500,600]);p.setCropBox(20,30,300,400);p.setRotation(degrees(90));p.drawRectangle({x:20,y:30,width:100,height:150,color:rgb(1,0,0)});p.drawLine({start:{x:100,y:150},end:{x:300,y:300},thickness:.2});const data=Buffer.from(await src.save()).toString('base64'),project=structuredClone(base);project.pdfSources={a:data};project.screens[0].background={src:'',x:0,y:0,w:794,h:595.5,opacity:.5,visible:true,pdf:{sourceId:'a',pageNumber:1,pageWidth:400,pageHeight:300}};
  const {bytes}=await composeVectorPDF(project,[{elements:[]}],{paperMM:[210,297]});assert.doesNotMatch(Buffer.from(bytes).toString('latin1'),/\/Subtype \/Image/);const out=await PDFDocument.load(bytes);assert.equal(out.getPageCount(),1);writeFileSync('/tmp/kaigi-vector-qa/rotated.pdf',bytes);
 });
-test('unsupported font glyphs fail instead of silently becoming missing boxes',async()=>{
- await assert.rejects(composeVectorPDF(base,[{elements:[{x:0,y:0,w:100,h:100,textRuns:[{text:'😀',x:0,baseline:20,size:16,color:[0,0,0,1]}]}]}],{fontBytes}),/glyph unavailable/);
+test('unsupported font glyphs are replaced on export and reported without mutating prepared text',async()=>{
+ const prepared=[{elements:[{x:0,y:0,w:100,h:100,textRuns:[{text:'😀',x:0,baseline:20,size:16,color:[0,0,0,1]}]}]}],before=structuredClone(prepared);
+ const result=await composeVectorPDF(base,prepared,{fontBytes});assert.equal(result.replacements.length,1);assert.equal(result.replacements[0].replacement,'〓');assert.deepEqual(prepared,before);assert.ok(result.bytes.length>0);
 });
 test('source text annotations are preserved instead of blocking vector export',async()=>{
  const src=await PDFDocument.create(),page=src.addPage();page.node.set(PDFName.of('Annots'),src.context.obj([src.context.obj({Type:'Annot',Subtype:'Text',Rect:[0,0,10,10]})]));const project=structuredClone(base);project.pdfSources={a:Buffer.from(await src.save()).toString('base64')};project.screens[0].background={x:0,y:0,w:100,h:100,opacity:1,visible:true,pdf:{sourceId:'a',pageNumber:1,pageWidth:100,pageHeight:100}};const result=await composeVectorPDF(project,[{elements:[]}]);const out=await PDFDocument.load(result.bytes);assert.equal(out.getPage(0).node.Annots().size(),1);assert.equal(result.preservedAnnotations,1);

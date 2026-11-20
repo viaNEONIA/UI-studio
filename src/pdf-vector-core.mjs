@@ -1,3 +1,4 @@
+import {substituteProject,substituteText} from './pdf-text-fallback.mjs';
 import {annotationParts,annotationTransform,annotationBounds,addEditableAnnotation} from './pdf-editable.mjs';
 import {flattenSourceForms,preserveAnnotations,inversePageRotation} from './pdf-annotations.mjs';
 import {pageBox} from './page-geometry.mjs';
@@ -23,7 +24,7 @@ export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onPro
  if(!['normal','editable'].includes(mode))throw Error('PDF出力方式が正しくありません');
  if(typeof author!=='string'||author.length>200)throw Error('PDF作成者は200文字以内で指定してください');exportedAt=new Date(exportedAt);if(!Number.isFinite(exportedAt.getTime()))throw Error('PDF出力日時が不正です');
  const doc=await PDFDocument.create();doc.setAuthor(author);doc.setCreationDate(exportedAt);doc.setModificationDate(exportedAt);doc.setTitle('会議ノート');doc.setCreator('会議ノート');doc.setProducer('会議ノート — ベクター合成');doc.registerFontkit(alignedFontkit);
- let font,metrics;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:true});metrics=fontkit.create(fontBytes);const available=new Set(font.getCharacterSet());for(const p of prepared)for(const e of p.elements)for(const run of e.textRuns||[])for(const ch of run.text)if(!available.has(ch.codePointAt(0)))throw Error('font glyph unavailable: '+ch+' (U+'+ch.codePointAt(0).toString(16).toUpperCase()+')')}
+ let replacements=[],font,metrics;const needText=prepared.some(p=>p.elements.some(e=>e.textRuns?.length));if(needText){if(!fontBytes)throw Error('PDF用フォントを読み込めません');font=await doc.embedFont(fontBytes,{subset:true});metrics=fontkit.create(fontBytes);const available=new Set(font.getCharacterSet()),sanitized=substituteProject(project,available);project=sanitized.project;replacements=sanitized.replacements;prepared=structuredClone(prepared);for(const [i,p] of prepared.entries())for(const [j,e] of p.elements.entries())for(const run of e.textRuns||[])run.text=substituteText(run.text,available,item=>{if(!sanitized.replacements.length)replacements.push({...item,page:i+1,pageName:project.screens[i]?.name||String(i+1),objectId:project.screens[i]?.elements[j]?.id||'',objectName:project.screens[i]?.elements[j]?.name||'文字'})})}
  const images=new Map(),imageFor=src=>{if(!images.has(src))images.set(src,embedImage(doc,src));return images.get(src)};
  const embedded=new Map();let flattenedForms=0,backgroundFallbacks=0,preservedAnnotations=0,omittedLinks=0;
  for(const sourceId of new Set(project.screens.filter(s=>s.background?.visible&&s.background.pdf).map(s=>s.background.pdf.sourceId))){
@@ -54,10 +55,10 @@ export async function composeVectorPDF(project,prepared,{fontBytes,paperMM,onPro
  async function drawElement(page,e,box){
    const bottom=box.height-e.y-e.h;
    if(e.paths){page.pushOperators(pushGraphicsState(),setLineJoin(LineJoinStyle.Round));for(const path of e.paths){const fill=path.fill?.[3]>0?color(path.fill):undefined,stroke=path.stroke?.[3]>0&&path.width>0?color(path.stroke):undefined;if(fill||stroke)page.drawSvgPath(path.d,{x:e.x,y:box.height-e.y,scale:1,color:fill,borderColor:stroke,borderWidth:stroke?path.width:0,opacity:path.fill?.[3]??1,borderOpacity:(path.stroke?.[3]??1)*path.strokeOpacity,borderLineCap:LineCapStyle.Round})}page.pushOperators(popGraphicsState())}
-   if(e.image){clipBox(page,e.x,bottom,e.w,e.h);const image=await imageFor(e.image),fit=e.cover?Math.max(e.w/image.width,e.h/image.height):1,w=e.cover?image.width*fit:e.w,h=e.cover?image.height*fit:e.h;page.drawImage(image,{x:e.x+(e.w-w)/2,y:bottom+(e.h-h)/2,width:w,height:h});page.pushOperators(popGraphicsState());if(e.rasterized)rasterized++}
+   if(e.image){clipBox(page,e.x,bottom,e.w,e.h);const image=await imageFor(e.image),fit=e.cover?Math.max(e.w/image.width,e.h/image.height):1,w=e.cover?image.width*fit:e.w,h=e.cover?image.height*fit:e.h;page.drawImage(image,{x:e.x+(e.w-w)/2,y:bottom+(e.h-h)/2,width:w,height:h,opacity:e.opacity??1});page.pushOperators(popGraphicsState());if(e.rasterized)rasterized++}
    if(e.textRuns?.length){clipBox(page,e.x,bottom,e.w,e.h);for(const run of e.textRuns){const p=textRunPlacement(run,font,metrics);page.pushOperators(pushGraphicsState(),concatTransformationMatrix(p.sx,0,0,p.sy,p.x,box.height+p.y));page.drawText(run.text,{x:0,y:0,font,size:run.size,color:color(run.color),opacity:run.color[3]});page.pushOperators(popGraphicsState())}page.pushOperators(popGraphicsState())}
  }
  for(const job of annotationJobs){const result=preserveAnnotations(job,targets);preservedAnnotations+=result.count;omittedLinks+=result.omittedLinks}
- return {bytes:await doc.save({useObjectStreams:false}),rasterized,flattenedForms,backgroundFallbacks,preservedAnnotations,omittedLinks,editableAnnotations,flattenedObjects};
+ return {replacements,bytes:await doc.save({useObjectStreams:false}),rasterized,flattenedForms,backgroundFallbacks,preservedAnnotations,omittedLinks,editableAnnotations,flattenedObjects};
 }
 async function embedImage(doc,src){if(/^data:image\/jpe?g;/i.test(src))return doc.embedJpg(src);return doc.embedPng(src)}
