@@ -8,7 +8,7 @@ PDFの図面に線・図形・文字を書き込み、会議中の確認事項�
 
 ## 最新の実装とブランチ
 
-2026年11月21日（日本時間）更新。`main` にはPR [#42](https://github.com/viaNEONIA/UI-studio/pull/42)のスタンプ拡張・未収録文字対策・UI修正と、PR [#43](https://github.com/viaNEONIA/UI-studio/pull/43)の実装予定整理が反映済みです。`feat/html-slide-annotations` ではHTMLスライドの静的取り込み・独立した注釈編集・AI指示JSON出力を追加しています。この開発ブランチの変更はmain未統合です。
+2026年11月21日（日本時間）更新。`main` にはPR [#42](https://github.com/viaNEONIA/UI-studio/pull/42)のスタンプ拡張・未収録文字対策・UI修正と、PR [#43](https://github.com/viaNEONIA/UI-studio/pull/43)の実装予定整理が反映済みです。PR [#44](https://github.com/viaNEONIA/UI-studio/pull/44)の `feat/html-slide-annotations` ではHTMLスライドの静的取り込み・独立した注釈編集・AI指示JSON出力を追加しています。この開発ブランチの変更はmain未統合です。
 
 | 対象 | 状態・内容 |
 | --- | --- |

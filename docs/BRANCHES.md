@@ -1,6 +1,6 @@
 # ブランチ情報
 
-確認日：2026年11月19日（日本時間）
+確認日：2026年11月21日（日本時間）
 
 これは確認時点の一覧です。最新の状態は[ブランチ一覧](https://github.com/viaNEONIA/UI-studio/branches)と[オープンPR](https://github.com/viaNEONIA/UI-studio/pulls)を参照してください。
 
@@ -8,15 +8,15 @@
 
 | 対象 | 確認時点の状態 |
 | --- | --- |
-| `main` | `0acb08cc53d2198863cb2ab67e9db595bf798519`。PR #39まで統合済み |
-| `latest-dev` | `0acb08cc53d2198863cb2ab67e9db595bf798519`を指す配布用タグ。ブランチではない |
-| `docs/readme-roadmap-status-20261119` | 上記mainを起点にREADME・実装予定・ブランチ情報を更新する作業ブランチ。マージ後はmainにも同内容が反映される |
+| `main` | `46a4baab674d6dbe0e97c2628f4e768e3ceda6b9`。PR #43まで統合済み |
+| `latest-dev` | 同じ `46a4baa` を指す配布用タグ（確認時点）。ブランチではない |
+| `feat/html-slide-annotations` | mainを起点にHTMLスライド静的取込・注釈編集・AI指示JSONを追加。[PR #44](https://github.com/viaNEONIA/UI-studio/pull/44)、main未統合 |
 
-新しい開発はmainを起点にします。残存する過去のブランチ名から最新の機能や未完了作業を判断しないでください。この文書の更新前にオープンPRはありませんでした。
+新しい開発はmainを起点にします。残存する過去のブランチ名から最新の機能や未完了作業を判断しないでください。
 
 ## リモートに残っている過去の作業ブランチ
 
-`git rev-list --count origin/main..origin/<branch>`で各ブランチにのみ存在するコミットを確認しました。以下はすべて0件で、現在のmainに含まれています。ブランチは削除していません。
+`git rev-list --count origin/main..origin/<branch>`で各ブランチにのみ存在するコミットを確認しました。以下は2026年11月19日の調査です。当時すべて0件で、当時のmainに含まれていました。ブランチは削除していません。
 
 | ブランチ | 先端コミット | 統合状況 |
 | --- | --- | --- |
