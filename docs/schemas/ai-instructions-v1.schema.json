@@ -79,6 +79,13 @@
           "height": {
             "type": "number",
             "exclusiveMinimum": 0
+          },
+          "sourceSelector": {
+            "type": "string"
+          },
+          "sourceIndex": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }
@@ -196,6 +203,33 @@
                 },
                 "color": {
                   "type": "string"
+                },
+                "points": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
+                "textBounds": {
+                  "$ref": "#/$defs/rect"
+                },
+                "strokeWidth": {
+                  "type": "number",
+                  "minimum": 0
                 }
               }
             }
