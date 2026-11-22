@@ -1,0 +1,28 @@
+import Ajv2020 from 'ajv/dist/2020.js';
+import schema from '../docs/schemas/ai-instructions-v1.schema.json' with {type:'json'};
+import {expandObjects,objectTree} from './compound-objects.mjs';
+export const actions=['review','modify','move','resize','add','remove','replace'];
+const validateSchema=new Ajv2020({allErrors:true,strict:false}).compile(schema);
+const finite=v=>typeof v==='number'&&Number.isFinite(v);
+const rect=b=>b&&['x','y','width','height'].every(k=>finite(b[k]))&&b.width>=0&&b.height>=0;
+const text=(s,max=10000)=>typeof s==='string'&&s.length<=max;
+const own=(o,k)=>o&&Object.hasOwn(o,k);
+export async function htmlHash(html){const bytes=new TextEncoder().encode(html),digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+export async function verifyHTMLSource(source){if(await htmlHash(source.html)!==source.sourceHash)throw Error('元HTMLのハッシュが一致しません。原本を再取り込みしてください');return source}
+export function validateHTMLProject(p){
+ const fail=()=>{throw Error('HTML資料・AI指示の形式が正しくありません')};
+ if(p.htmlSources!=null){if(typeof p.htmlSources!=='object'||Array.isArray(p.htmlSources)||Object.keys(p.htmlSources).length>50)fail();for(const [id,s]of Object.entries(p.htmlSources)){if(!id||!s||!text(s.name,300)||!s.name||!text(s.html,10*1024*1024)||!s.html||!text(s.sourceHash,64)||!/^([a-f0-9]{64})$/.test(s.sourceHash)||!s.viewport||!['width','height'].every(k=>Number.isInteger(s.viewport[k])&&s.viewport[k]>0&&s.viewport[k]<=4096))fail()}}
+ for(const sc of p.screens){const h=sc.background?.html;if(h){if(!own(p.htmlSources,h.sourceId)||sc.background.pdf||!Number.isInteger(h.slideIndex)||h.slideIndex<0||!text(h.selector,4000)||!['width','height'].every(k=>finite(h[k])&&h[k]>0&&h[k]<=4096)||!Array.isArray(h.targets)||h.targets.length>5000)fail();for(const t of h.targets)if(!t||!text(t.selector,4000)||!t.selector||!text(t.textHint,300)||t.elementId!=null&&!text(t.elementId,1000)||!rect(t.bounds))fail()}
+ for(const e of objectTree(sc.elements)){const a=e.aiInstruction;if(a!=null&&(!a||typeof a!=='object'||Array.isArray(a)||!text(a.text)||!actions.includes(a.action)||a.targetSelector!=null&&!text(a.targetSelector,4000)||a.sourceId!=null&&!text(a.sourceId,200)||a.slideIndex!=null&&(!Number.isInteger(a.slideIndex)||a.slideIndex<0)))fail()}}
+ return p;
+}
+export function pruneHTMLSources(p){if(p.htmlSources){const used=new Set(p.screens.map(s=>s.background?.html?.sourceId));p.htmlSources=Object.fromEntries(Object.entries(p.htmlSources).filter(([id])=>used.has(id)));if(!Object.keys(p.htmlSources).length)delete p.htmlSources}}
+export function htmlTransform(b){const h=b.html,scale=Math.min(b.w/h.width,b.h/h.height);if(!finite(scale)||scale<=0)throw Error('HTML背景の寸法が正しくありません');const left=b.x+(b.w-h.width*scale)/2,top=b.y+(b.h-h.height*scale)/2;return {scale,left,top,point:(x,y)=>({x:(x-left)/scale,y:(y-top)/scale}),bounds:e=>({x:(e.x-left)/scale,y:(e.y-top)/scale,width:e.w/scale,height:e.h/scale})}}
+function annotation(e,tr){const a={id:e.id,kind:e.callout?'callout':e.inkTool?'freehand':({box:'rectangle',circle:'ellipse',text:'text',line:'line',arrow:'arrow',polyline:'line',curve:'line'}[e.type]||'other'),bounds:tr.bounds(e)};if(e.text&&e.type!=='html'&&e.type!=='image')a.label=e.text;if(e.stroke||e.color)a.color=e.stroke||e.color;const points=e.callout?.points||e.points||e.corners;if(points)a.points=points.map(([x,y])=>tr.point(e.x+x*e.w,e.y+y*e.h));if(e.callout){const [x,y,w,h]=e.callout.box;a.textBounds=tr.bounds({x:e.x+x*e.w,y:e.y+y*e.h,w:w*e.w,h:h*e.h})}if(finite(e.strokeWidth))a.strokeWidth=e.strokeWidth/tr.scale;return a}
+export function validateAIInstructions(data){if(!validateSchema(data))throw Error('AI指示JSONがスキーマに適合しません: '+validateSchema.errors.map(e=>e.instancePath+' '+e.message).join('; '));const ids=new Set(data.slides.map(s=>s.id));if(ids.size!==data.slides.length||data.instructions.some(i=>!ids.has(i.slideId)))throw Error('AI指示のページ参照が正しくありません');return data}
+export function buildAIInstructions(p,sourceId){
+ validateHTMLProject(p);if(!own(p.htmlSources,sourceId))throw Error('HTML資料を選択してください');const source=p.htmlSources[sourceId],screens=p.screens.filter(s=>s.background?.html?.sourceId===sourceId);if(!screens.length)throw Error('対象のHTMLページがありません');
+ const data={schemaVersion:'1.0.0',document:{sourceFile:source.name,sourceType:'html',sourceHash:source.sourceHash,viewport:source.viewport},slides:screens.map(s=>({id:s.id,name:s.name,width:s.background.html.width,height:s.background.html.height,sourceSelector:s.background.html.selector,sourceIndex:s.background.html.slideIndex})),instructions:[]};let omitted=0,fallback=0;
+ for(const sc of screens){const b=sc.background,h=b.html,tr=htmlTransform(b);const collect=elements=>{for(const e of elements){if(e.type==='compound'&&!e.aiInstruction?.text?.trim()){collect(expandObjects([e]));continue}const ai=e.aiInstruction,text=(ai?.text||e.pdfComment||(['text'].includes(e.type)?e.text:'')||'').trim();if(!text){omitted++;continue}const leaves=e.type==='compound'?expandObjects([e]):[e],annotations=leaves.map(c=>annotation(c,tr));const target=ai?.sourceId===sourceId&&ai?.slideIndex===h.slideIndex?h.targets.find(t=>t.selector===ai.targetSelector):null;let action=ai?.action||'review';if(!target&&action!=='add'){action='review';fallback++}data.instructions.push({id:e.id,slideId:sc.id,action,text,target:target?structuredClone(target):{bounds:tr.bounds(e)},annotations})}};collect(sc.elements)}
+ if(!data.instructions.length)throw Error('出力する指示がありません。注釈を選択し「AI修正指示」を入力してください');return {data:validateAIInstructions(data),omitted,fallback};
+}

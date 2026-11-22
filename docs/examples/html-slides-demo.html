@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>会議ノート HTMLスライド取込サンプル</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: sans-serif; color: #172235; background: #e2e8f0; }
+.slide { position: relative; width: 640px; height: 360px; padding: 32px; background: #f8fafc; overflow: hidden; }
+.slide + .slide { margin-top: 20px; }
+h1 { margin: 0 0 12px; font-size: 28px; }
+p { margin: 0; font-size: 18px; line-height: 1.8; }
+.card { position: absolute; left: 32px; top: 140px; width: 360px; height: 160px; padding: 20px; border: 2px solid #94a3b8; border-radius: 12px; background: #ffffff; }
+button { position: absolute; left: 450px; top: 250px; width: 150px; height: 50px; border: 0; border-radius: 8px; background: #2563eb; color: white; font-size: 20px; }
+#slide-2 { background: #eef2ff; }
+</style>
+</head>
+<body>
+<section class="slide" id="slide-1" data-title="保存ボタンの配置確認">
+<h1>配置の確認</h1>
+<p>HTMLを取り込んだ後、矢印や引き出し線で指示を追加します。</p>
+<div class="card" id="summary-card"><p>会議資料の見出し・説明文を表示するカードです。</p></div>
+<button id="save-button">保存</button>
+</section>
+<section class="slide" id="slide-2" data-title="次のスライドへの指示">
+<h1 id="second-title">2ページ目の確認</h1>
+<p id="second-description">ページごとに注釈と対象要素を保持します。</p>
+<div class="card" id="review-card"><p>対象を指定しない指示は、座標を添えて要確認として出力します。</p></div>
+</section>
+</body>
+</html>

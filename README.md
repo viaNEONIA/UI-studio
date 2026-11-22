@@ -8,11 +8,12 @@ PDFの図面に線・図形・文字を書き込み、会議中の確認事項�
 
 ## 最新の実装とブランチ
 
-2026年11月20日（日本時間）更新。PR [#42](https://github.com/viaNEONIA/UI-studio/pull/42)の `feat/stamp-capture-pdf-ui` で、範囲指定スタンプ、背景透過・不透明度・登録前プレビュー、PDF未収録文字の置換と一覧TXT、承認済みUI配置、引き出し線の編集用色指定を追加しました。mainへの統合と配布版の更新状況はPRとReleaseで確認してください。
+2026年11月21日（日本時間）更新。`main` にはPR [#42](https://github.com/viaNEONIA/UI-studio/pull/42)のスタンプ拡張・未収録文字対策・UI修正と、PR [#43](https://github.com/viaNEONIA/UI-studio/pull/43)の実装予定整理が反映済みです。PR [#44](https://github.com/viaNEONIA/UI-studio/pull/44)の `feat/html-slide-annotations` ではHTMLスライドの静的取り込み・独立した注釈編集・AI指示JSON出力を追加しています。この開発ブランチの変更はmain未統合です。
 
 | 対象 | 状態・内容 |
 | --- | --- |
-| [`main`](https://github.com/viaNEONIA/UI-studio/tree/main) | 開発の統合先。README整理のPR #40を含む更新履歴を確認 |
+| [`main`](https://github.com/viaNEONIA/UI-studio/tree/main) | 開発の統合先。PR #43まで統合済み（確認時点 `46a4baa`） |
+| [`feat/html-slide-annotations`](https://github.com/viaNEONIA/UI-studio/tree/feat/html-slide-annotations) | HTMLスライド取込・注釈編集・AI指示JSON出力。mainへの統合前 |
 | [`latest-dev`](https://github.com/viaNEONIA/UI-studio/releases/tag/latest-dev) | 検証済み配布物を更新するタグ。開発ブランチではありません |
 | PR [#39](https://github.com/viaNEONIA/UI-studio/pull/39) | 保存名指定、名前を付けて保存、F/Q切替キー、引き出し線付きテキスト、PDF作成者・日時を追加。mainへマージ済み |
 | [`feat/workflow-pdf-fixes`](https://github.com/viaNEONIA/UI-studio/tree/feat/workflow-pdf-fixes) / PR [#38](https://github.com/viaNEONIA/UI-studio/pull/38) | 2点目での確定、Shift変形、結合・分解、PDF文字配置・回転・埋め込みフォント修正。mainへマージ済み |
@@ -187,12 +188,28 @@ PDFは元資料のページ寸法を保持します。用紙プリセットは�
 - 暗号化・パスワード付きPDFは非対応です。HTML部品（iframe）と外部URL画像はPNG・PDF・PPTX出力に対応しません。追加CSSのある部品はPDF出力に非対応で、PNG・PPTXでも表示差が生じる場合があります。
 - 旧JSON（`version:1`）の読み込み互換性を維持します。新機能を含むデータを古いアプリで開くことは保証しません。
 
+## HTMLスライドへの修正指示
+
+動作確認用に[2ページのHTMLサンプル](docs/examples/html-slides-demo.html)を用意しています。表示幅640px・高さ360pxで取り込めます。
+
+1. 「画面設定 → HTMLスライド・AI指示 → HTMLスライドを取り込む」でローカルHTMLを選びます。
+2. 元のHTMLを想定した表示幅・高さと、必要ならスライドのCSSセレクターを指定します。自動検出できない文書は1ページになります。
+3. 取り込んだ背景の上に既存の図形・文字・矢印・引き出し線で注釈を追加します。HTML本体の要素は直接変更しません。
+4. 注釈を選択して右パネルの「AI修正指示」に修正内容と操作を入力します。「対象のHTML要素」で要素を選ぶと青い破線で対象を表示します。
+5. 左パネルで元HTML資料を選び「AI指示JSON出力」を押します。「元HTML保存」と、通常の注釈付きPDF・HTML出力を合わせてAIへ渡してください。
+6. 編集の再開には通常のJSONまたはZIPを保存します。原本・ハッシュ・ページとの対応・注釈・対象指定も保持します。AI指示JSONは編集用ノートとしては読み込めません。
+
+**表示範囲：** UTF-8の単一HTML、10MB・50スライドまで。各ページ1〜4096px、1600万画素までです。インラインCSSとデータURIのPNG・JPEG・GIF・WebP画像を静的に描画します。JavaScript、外部CSS・外部画像、CSSのURL参照、Webフォント、動画、iframe等は除外します。元HTMLは保存したまま、表示用の複製だけを処理します。動的スライドや複雑なCSSは元と同じ見た目を保証できません。取り込み後は背景画像なので拡大時に画質の限界があります。
+
+**AI指示：** スライド基準のCSS pxへ座標を変換し、ID・セレクター・対象の文字・図形座標を出力します。指示文は「AI修正指示 → PDFコメント → テキスト注釈本文」の順で取得し、指示文のない図形は除外します。対象未指定・別資料への対象指定は `review`（要確認）へ変更します（`add` は座標指定で維持）。出力前に原本のSHA-256とJSON Schemaを検証します。対象セレクターは確認用の手掛かりであり、AIによる誤適用を防ぐため原本と合わせて確認してください。
+
+[JSON仕様](docs/AI_INSTRUCTIONS_JSON.md)にフィールドと制約を記載しています。
+
 ## 将来の実装予定（未実装のみ）
 
 - フロー図専用ツールパレット。
-- HTMLスライドの読込、独立した注釈レイヤー、AI向け構造化JSON出力。
 
-実装済みのスタンプ拡張・未収録文字対策・ショートカット・引き出し線文字は、この一覧から除外しました。詳細は[将来実装予定](docs/ROADMAP.md)を参照してください。
+実装済みのスタンプ拡張・未収録文字対策・ショートカット・引き出し線文字と、この開発ブランチで追加したHTML読込・AI指示JSONは、この一覧から除外しました。詳細は[将来実装予定](docs/ROADMAP.md)を参照してください。
 
 ### PDF文字置換一覧
 
