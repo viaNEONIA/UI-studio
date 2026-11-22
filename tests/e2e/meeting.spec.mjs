@@ -1,3 +1,4 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
@@ -6,7 +7,7 @@ import {jsPDF} from 'jspdf';
 import JSZip from 'jszip';
 import {readFile,writeFile} from 'node:fs/promises';
 function samplePDF(){const pdf=new jsPDF({unit:'mm',format:'a4'});pdf.setFillColor(245,220,200);pdf.rect(0,0,210,297,'F');pdf.text('Dummy meeting page 1',20,30);pdf.addPage();pdf.setFillColor(200,230,245);pdf.rect(0,0,210,297,'F');pdf.text('Dummy meeting page 2',20,30);return Buffer.from(pdf.output('arraybuffer'))}
-async function download(page,id){const pending=page.waitForEvent('download');await page.locator(id).click();return readFile(await(await pending).path())}
+async function download(page,id){const pending=page.waitForEvent('download');await clickToolbar(page.locator(id));return readFile(await(await pending).path())}
 async function saved(page){return JSON.parse((await download(page,'#saveJson')).toString())}
 async function importPDF(page){await page.locator('#documentFile').setInputFiles({name:'dummy.pdf',mimeType:'application/pdf',buffer:samplePDF()});await expect(page.locator('#meetingStatus')).toContainText('2ページを取り込みました',{timeout:60000})}
 test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});

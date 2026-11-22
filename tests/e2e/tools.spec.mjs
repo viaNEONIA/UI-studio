@@ -1,9 +1,10 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {confirmTwoPointDraft} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
-async function saved(page){const promise=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await promise).path(),'utf8'))}
+async function saved(page){const promise=page.waitForEvent('download');await clickToolbar(page.locator('#saveJson'));return JSON.parse(await readFile(await(await promise).path(),'utf8'))}
 async function setInput(page,id,value){await page.locator(id).evaluate((n,v)=>{n.value=v;n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}))},String(value))}
 test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});
 test('Material panel collapses while shapes stay available; shape fill and outline round trip',async({page})=>{
@@ -12,7 +13,7 @@ test('Material panel collapses while shapes stay available; shape fill and outli
  const g=page.locator('.element svg g');await expect(g).toHaveAttribute('fill','rgba(255,0,0,0.6)');await expect(g).toHaveAttribute('stroke','#0000ff');await expect(g).toHaveAttribute('stroke-opacity','0.25');await expect(g).toHaveAttribute('stroke-width','6');
  await page.locator('#addTriangle').click();await placePendingObject(page);const p=await saved(page);expect(p.screens[0].elements.map(e=>e.type)).toEqual(['circle','triangle']);
  await page.locator('#file').setInputFiles({name:'round.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});expect(await saved(page)).toEqual(p);
- const pending=page.waitForEvent('download');await page.locator('#exportHtml').click();const html=await readFile(await(await pending).path(),'utf8');await page.setContent(html);await expect(page.locator('.item svg')).toHaveCount(2);await expect(page.locator('.item svg g').first()).toHaveAttribute('stroke-opacity','0.25');
+ const pending=page.waitForEvent('download');await clickToolbar(page.locator('#exportHtml'));const html=await readFile(await(await pending).path(),'utf8');await page.setContent(html);await expect(page.locator('.item svg')).toHaveCount(2);await expect(page.locator('.item svg g').first()).toHaveAttribute('stroke-opacity','0.25');
 });
 test('locked layers resist drag, text edit, deletion and group movement; unlock restores editing',async({page})=>{
  await page.locator('#addBox').click();await placePendingObject(page);await page.locator('#pLocked').check();await expect(page.locator('#pText')).toBeDisabled();const before=await saved(page),b=await page.locator('.element').boundingBox();

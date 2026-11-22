@@ -1,3 +1,4 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {PDFDocument,PDFName,rgb,degrees} from 'pdf-lib';
 import {readFile,writeFile} from 'node:fs/promises';
@@ -8,7 +9,7 @@ const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs');
 const item=(id,type,x,y,w,h,text='',extra={})=>({id,type,name:id,x,y,w,h,text,bg:'transparent',bgTransparent:true,color:'#172235',font:22,radius:0,css:'',link:'',...extra});
 const project=elements=>({version:1,width:600,height:800,screens:[{id:'s',name:'会議',elements}]});
 async function load(page,p){await page.locator('#file').setInputFiles({name:'vector.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))})}
-async function download(page,id='#exportPdf'){const w=page.waitForEvent('download');await page.locator(id).click();return readFile(await(await w).path())}
+async function download(page,id='#exportPdf'){const w=page.waitForEvent('download');await clickToolbar(page.locator(id));return readFile(await(await w).path())}
 async function saved(page){return JSON.parse((await download(page,'#saveJson')).toString())}
 async function inspect(bytes,width){const task=pdfjs.getDocument({data:new Uint8Array(bytes),useSystemFonts:false,standardFontDataUrl:process.cwd()+'/node_modules/pdfjs-dist/standard_fonts/'});try{const doc=await task.promise,p=await doc.getPage(1),text=(await p.getTextContent()).items.map(x=>x.str).join(''),ops=await p.getOperatorList(),images=ops.fnArray.filter(x=>[pdfjs.OPS.paintImageXObject,pdfjs.OPS.paintInlineImageXObject].includes(x)).length;let png;if(width){const v=p.getViewport({scale:width/p.getViewport({scale:1}).width}),c=createCanvas(Math.ceil(v.width),Math.ceil(v.height));await p.render({canvasContext:c.getContext('2d'),viewport:v}).promise;png=await c.encode('png')}return {text,images,png,pages:doc.numPages}}finally{await task.destroy()}}
 async function source(rotation=0,annot=false){const doc=await PDFDocument.create(),p=doc.addPage([500,600]);p.setCropBox(20,30,300,400);p.setRotation(degrees(rotation));p.drawRectangle({x:20,y:30,width:300,height:400,color:rgb(1,1,1)});p.drawRectangle({x:20,y:30,width:140,height:180,color:rgb(1,0,0)});p.drawRectangle({x:70,y:100,width:160,height:150,color:rgb(0,0,1)});p.drawText('Original vector plan',{x:50,y:350,size:16});p.drawLine({start:{x:40,y:320},end:{x:290,y:320},thickness:.15});if(annot)p.node.set(PDFName.of('Annots'),doc.context.obj([doc.context.obj({Type:'Annot',Subtype:'Text',Rect:[10,10,20,20],Contents:'note'})]));return Buffer.from(await doc.save())}
@@ -24,7 +25,7 @@ test('bitmap background remains an image while annotations stay vector, and UI c
  test.setTimeout(120000);const p=project([item('note','text',40,80,300,80,'写真と注記'),item('card','card',40,250,340,140,'カード|補足説明',{bg:'#f3edf7',bgTransparent:false})]);p.screens[0].background={src:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',name:'legacy',x:0,y:0,w:600,h:800,opacity:1,visible:true,locked:true};await load(page,p);const result=await inspect(await download(page));expect(result.text).toContain('写真と注記');expect(result.images).toBeGreaterThanOrEqual(2);await expect(page.locator('#meetingStatus')).toContainText('UI部品等1個は画像');
 });
 test('HTML and additional CSS fail clearly without downloading or changing the project',async({page})=>{
- test.setTimeout(120000);let count=0;page.on('download',()=>count++);for(const [e,message]of [[item('html','html',0,0,100,100,'<p>x</p>'),'HTML部品'],[item('css','box',0,0,100,100,'',{css:'transform:rotate(20deg)'}),'追加CSS']]){await load(page,project([e]));await page.locator('#exportPdf').click();await expect(page.locator('#meetingStatus')).toContainText(message,{timeout:60000})}expect(count).toBe(0);
+ test.setTimeout(120000);let count=0;page.on('download',()=>count++);for(const [e,message]of [[item('html','html',0,0,100,100,'<p>x</p>'),'HTML部品'],[item('css','box',0,0,100,100,'',{css:'transform:rotate(20deg)'}),'追加CSS']]){await load(page,project([e]));await clickToolbar(page.locator('#exportPdf'));await expect(page.locator('#meetingStatus')).toContainText(message,{timeout:60000})}expect(count).toBe(0);
 });
 test('source PDF annotations are retained and no longer stop export',async({page})=>{
  await importPDF(page,await source(0,true));const bytes=await download(page),output=await PDFDocument.load(bytes);expect(output.getPage(0).node.Annots().size()).toBe(1);await expect(page.locator('#meetingStatus')).toContainText('注釈・リンク1件保持');

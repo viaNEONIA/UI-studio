@@ -1,9 +1,10 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {confirmTwoPointDraft,freezePendingPlacement} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {expandEditorPanels} from './editor-panels.mjs';
-async function saved(page){const w=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await w).path(),'utf8'))}
+async function saved(page){const w=page.waitForEvent('download');await clickToolbar(page.locator('#saveJson'));return JSON.parse(await readFile(await(await w).path(),'utf8'))}
 async function at(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());return{x:r.x+(x+2)*z,y:r.y+(y+2)*z}}
 async function click(page,x,y){const p=await at(page,x,y);await page.mouse.click(p.x,p.y);await confirmTwoPointDraft(page)}
 async function move(page,x,y){const p=await at(page,x,y);await page.mouse.move(p.x,p.y)}
@@ -12,7 +13,7 @@ function world(e){return e.points.map(([x,y])=>[e.x+x*e.w,e.y+y*e.h])}
 function close(actual,expected){expect(actual[0]).toBeCloseTo(expected[0],3);expect(actual[1]).toBeCloseTo(expected[1],3)}
 test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});
 for(const [id,type]of [['drawLine','line'],['drawArrow','arrow'],['drawPolyline','polyline'],['drawCurve','curve'],['drawGuide','guide']])test(type+' keeps its tool and first point across wheel-only zoom',async({page},info)=>{
- await page.locator('#'+id).click();await placePendingObject(page);await click(page,90,130);await move(page,200,240);await zoomWheel(page);await expect(page.locator('#device')).toHaveClass(/drawing/);await expect(page.locator('.drawing-preview')).toHaveCount(1);const pts=await page.locator('.drawing-preview polyline').evaluate(n=>[...n.points].map(p=>[p.x,p.y]));close(pts[0],[90,130]);if(type==='line')await page.screenshot({path:info.outputPath('line-draft-after-wheel-zoom.png')});await click(page,260,320);if(['polyline','curve'].includes(type))await freezePendingPlacement(page);await page.keyboard.press('Enter');const p=await saved(page);if(type==='guide'){const g=p.screens[0].guidelines[0];close([g.x,g.y],[90,130]);close([g.dx,g.dy],[170,190])}else{expect(p.screens[0].elements).toHaveLength(1);expect(p.screens[0].elements[0].type).toBe(type);const points=world(p.screens[0].elements[0]);close(points[0],[90,130]);close(points[1],[260,320])}
+ await clickToolbar(page.locator('#'+id));await placePendingObject(page);await click(page,90,130);await move(page,200,240);await zoomWheel(page);await expect(page.locator('#device')).toHaveClass(/drawing/);await expect(page.locator('.drawing-preview')).toHaveCount(1);const pts=await page.locator('.drawing-preview polyline').evaluate(n=>[...n.points].map(p=>[p.x,p.y]));close(pts[0],[90,130]);if(type==='line')await page.screenshot({path:info.outputPath('line-draft-after-wheel-zoom.png')});await click(page,260,320);if(['polyline','curve'].includes(type))await freezePendingPlacement(page);await page.keyboard.press('Enter');const p=await saved(page);if(type==='guide'){const g=p.screens[0].guidelines[0];close([g.x,g.y],[90,130]);close([g.dx,g.dy],[170,190])}else{expect(p.screens[0].elements).toHaveLength(1);expect(p.screens[0].elements[0].type).toBe(type);const points=world(p.screens[0].elements[0]);close(points[0],[90,130]);close(points[1],[260,320])}
 });
 test('wheel-only before placing the first point does not deselect the line tool',async({page})=>{
  await page.locator('#quickLine').click();await move(page,160,220);await zoomWheel(page);await expect(page.locator('#device')).toHaveClass(/drawing/);await click(page,100,160);await click(page,240,300);const p=await saved(page);expect(p.screens[0].elements).toHaveLength(1);close(world(p.screens[0].elements[0])[0],[100,160]);

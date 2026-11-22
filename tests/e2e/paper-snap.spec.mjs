@@ -1,9 +1,10 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {confirmTwoPointDraft} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import JSZip from 'jszip';
-async function download(page,id){const waiting=page.waitForEvent('download');await page.locator(id).click();return readFile(await(await waiting).path())}
+async function download(page,id){const waiting=page.waitForEvent('download');await clickToolbar(page.locator(id));return readFile(await(await waiting).path())}
 async function saved(page){return JSON.parse((await download(page,'#saveJson')).toString())}
 const item=(id,type,x,y,w,h,extra={})=>({id,type,name:id==='wire'?'接続線':'相手部品',x,y,w,h,text:'',bg:'#dbeafe',color:'#172235',font:16,radius:0,...extra});
 const wire=()=>item('wire','line',80,100,100,60,{bg:'transparent',stroke:'#172235',strokeWidth:3,points:[[0,0],[1,1]]});

@@ -1,3 +1,4 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {confirmTwoPointDraft,freezePendingPlacement} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
@@ -6,7 +7,7 @@ import {expandEditorPanels} from './editor-panels.mjs';
 const line=(type='line',extra={})=>({id:'line',type,name:'線',x:50,y:50,w:240,h:240,text:'',bg:'transparent',color:'#172235',font:16,radius:0,stroke:'#172235',strokeWidth:3,points:[[0,0],[1,1]],...extra});
 const box={id:'box',type:'box',name:'背後の図形',x:180,y:60,w:90,h:80,text:'注記',bg:'#dbeafe',color:'#172235',font:16,radius:0};
 async function load(page,elements){await page.locator('#file').setInputFiles({name:'hit.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({version:1,width:412,height:650,screens:[{id:'s',name:'試験',elements}]}))})}
-async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
+async function saved(page){const wait=page.waitForEvent('download');await clickToolbar(page.locator('#saveJson'));return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function at(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());return{x:r.x+(x+2)*z,y:r.y+(y+2)*z}}
 async function click(page,x,y){const p=await at(page,x,y);await page.mouse.click(p.x,p.y);await confirmTwoPointDraft(page)}
 async function drag(page,x,y,dx,dy){const p=await at(page,x,y),z=Number(await page.locator('#zoom').inputValue());await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move(p.x+dx*z,p.y+dy*z,{steps:5});await page.mouse.up()}
@@ -30,7 +31,7 @@ test('vertices still deform lines and locked line permits selecting underlying o
  await load(page,[{...box,x:100,y:100,w:140,h:140},line('line',{locked:true})]);const before=await saved(page);await click(page,170,170);await expect(page.locator('[data-id="box"]')).toHaveClass(/selected/);expect(await saved(page)).toEqual(before);
 });
 test('HTML output contains no selection highlight or interactive hit areas',async({page})=>{
- await load(page,[line('arrow',{endCap:'circle'})]);await click(page,170,170);const wait=page.waitForEvent('download');await page.locator('#exportHtml').click();const html=await readFile(await(await wait).path(),'utf8');await page.setContent(html);await expect(page.locator('.line-hit,.vertex,.resize')).toHaveCount(0);await expect(page.locator('[data-cap-end]')).toHaveAttribute('data-cap-end','circle');
+ await load(page,[line('arrow',{endCap:'circle'})]);await click(page,170,170);const wait=page.waitForEvent('download');await clickToolbar(page.locator('#exportHtml'));const html=await readFile(await(await wait).path(),'utf8');await page.setContent(html);await expect(page.locator('.line-hit,.vertex,.resize')).toHaveCount(0);await expect(page.locator('[data-cap-end]')).toHaveAttribute('data-cap-end','circle');
 });
 test('contextual buttons accurately show availability and lock action names',async({page})=>{
  for(const id of ['group','ungroup','alignLeft','alignTop','undo','redo','layerUp','layerDown','quickClearGuides','finishDrawing','cancelDrawing'])await expect(page.locator('#'+id)).toBeDisabled();

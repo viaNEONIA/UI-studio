@@ -1,9 +1,10 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {confirmTwoPointDraft,placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
-async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
+async function saved(page){const wait=page.waitForEvent('download');await clickToolbar(page.locator('#saveJson'));return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function settings(page){const wait=page.waitForEvent('download');await page.locator('#exportPropertyPresets').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function input(page,id,value){await page.locator(id).evaluate((n,value)=>{n.value=String(value);n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}))},value)}
 async function savePreset(page,name){await page.locator('#propertyPresetName').fill(name);await page.locator('#savePropertyPreset').click();await expect(page.locator('#propertyPresetStatus')).toContainText('保存しました')}

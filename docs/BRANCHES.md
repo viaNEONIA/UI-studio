@@ -1,6 +1,6 @@
 # ブランチ情報
 
-確認日：2026年11月21日（日本時間）
+確認日：2026年11月22日（日本時間）
 
 これは確認時点の一覧です。最新の状態は[ブランチ一覧](https://github.com/viaNEONIA/UI-studio/branches)と[オープンPR](https://github.com/viaNEONIA/UI-studio/pulls)を参照してください。
 
@@ -8,9 +8,10 @@
 
 | 対象 | 確認時点の状態 |
 | --- | --- |
-| `main` | `46a4baab674d6dbe0e97c2628f4e768e3ceda6b9`。PR #43まで統合済み |
-| `latest-dev` | 同じ `46a4baa` を指す配布用タグ（確認時点）。ブランチではない |
-| `feat/html-slide-annotations` | mainを起点にHTMLスライド静的取込・注釈編集・AI指示JSONを追加。[PR #44](https://github.com/viaNEONIA/UI-studio/pull/44)、main未統合 |
+| `main` | `3d1064989c12fb8e0969f21530986be4fd0cdbe4`。PR #44まで統合済み |
+| `latest-dev` | 配布用タグ。PR #44の統合後の配布状況はReleaseを確認。ブランチではない |
+| `feat/html-slide-annotations` | [PR #44](https://github.com/viaNEONIA/UI-studio/pull/44)でmainへ統合済み |
+| `feat/compact-toolbar-callout-centers` | `3d10649`を起点に右上メニュー集約・文字枠の四隅リサイズ・円の中心表示とスナップを追加。main未統合 |
 
 新しい開発はmainを起点にします。残存する過去のブランチ名から最新の機能や未完了作業を判断しないでください。
 
