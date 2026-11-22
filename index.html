@@ -893,7 +893,7 @@ function setupCompactToolbar(){
  const ai=$('exportAI');if(ai){output.append(ai);$('htmlStatus').before(Object.assign(document.createElement('p'),{className:'hint',textContent:'AI指示JSONは右上の「出力」メニューから保存できます。'}));const oldRender=renderMeeting;renderMeeting=function(){oldRender();ai.disabled=meetingBusy||!window.MeetingTools||!$('htmlSource').value}}
  function closeMenus(restoreFocus=false){for(const m of [saveMenu,exportMenu])if(m.open){m.open=false;if(restoreFocus)m.querySelector('summary').focus()}}
  for(const menu of [saveMenu,exportMenu])menu.addEventListener('toggle',()=>{if(menu.open)for(const other of [saveMenu,exportMenu])if(other!==menu)other.open=false;menu.querySelector('summary').setAttribute('aria-expanded',String(menu.open))});
- document.addEventListener('pointerdown',ev=>{if(!ev.target.closest('.toolbar-menu'))closeMenus()},true);document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&(saveMenu.open||exportMenu.open)){ev.preventDefault();ev.stopImmediatePropagation();closeMenus(true)}},true);
+ document.addEventListener('pointerdown',ev=>{if(!ev.target.closest('.toolbar-menu'))closeMenus()},true);window.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&(saveMenu.open||exportMenu.open)){ev.preventDefault();ev.stopImmediatePropagation();closeMenus(true)}},true);
  // Keep the PDF mode control open so it can be chosen before pressing export.
  for(const panel of [savePanel,output])panel.addEventListener('click',ev=>{if(ev.target.closest('button'))closeMenus()});
  const css=document.createElement('style');css.textContent=`
