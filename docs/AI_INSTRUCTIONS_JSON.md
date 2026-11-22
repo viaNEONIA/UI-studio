@@ -24,7 +24,7 @@ HTMLスライド上の注釈と、AIが実行すべき修正指示を対応付�
 
 ## 初期実装の出力
 
-`feat/html-slide-annotations` に実装。mainへの統合前です。
+PR #44でmainに統合済みです。
 
 - 1ファイルに1つの元HTMLを対応付け、その原本に由来する全ページを `slides` に出力します。同じ原本から複製したノートページは別の `id` を持ちます。
 - `slides.sourceSelector` と `sourceIndex`（0始まり）は原本内のページを特定する追加情報です。ルート全体の場合は `body` です。

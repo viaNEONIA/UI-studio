@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const code=readFileSync(new URL('../index.html',import.meta.url),'utf8').split('// EDITOR_GEOMETRY_START')[1].split('// EDITOR_GEOMETRY_END')[0];
+const {calloutAbsolute,calloutFromAbsolute,calloutWithBox,resizeCalloutBox,nearestCenterAnchor}=vm.runInNewContext(code+';({calloutAbsolute,calloutFromAbsolute,calloutWithBox,resizeCalloutBox,nearestCenterAnchor})');
+const plain=x=>JSON.parse(JSON.stringify(x));
+const box={x:300,y:100,w:180,h:70},tip=[80,330],e=calloutFromAbsolute(box,[tip,[276,135],[300,135]]);
+test('all four callout corners keep the opposite corner and reject inverted/zero-size rectangles',()=>{for(const c of ['nw','ne','sw','se']){const r=resizeCalloutBox(box,c,[c.includes('w')?250:550,c.includes('n')?60:220]);assert.equal(c.includes('w')?r.x+r.w:r.x,c.includes('w')?box.x+box.w:box.x);assert.equal(c.includes('n')?r.y+r.h:r.y,c.includes('n')?box.y+box.h:box.y);const tiny=resizeCalloutBox(box,c,[c.includes('w')?900:0,c.includes('n')?900:0]);assert.ok(tiny.w>=24&&tiny.h>=16)}});
+test('resizing text frame retains exact leader tip and native normalized serialization',()=>{for(const c of ['nw','ne','sw','se']){const b=resizeCalloutBox(box,c,[c.includes('w')?260:570,c.includes('n')?55:240]),r=calloutWithBox(e,b),a=calloutAbsolute(r);assert.deepEqual(plain(a.points[0]),tip);assert.deepEqual(plain(a.box),plain(b));for(const pt of r.callout.points)assert.ok(pt.every(n=>n>=0&&n<=1));const [x,y,w,h]=r.callout.box;assert.ok(x>=0&&y>=0&&w>0&&h>0&&x+w<=1&&y+h<=1);assert.deepEqual(plain(calloutAbsolute(JSON.parse(JSON.stringify(r)))),plain(a))}});
+test('leader connection follows the near box side when frame crosses the fixed tip',()=>{const b={x:-200,y:80,w:120,h:50},r=calloutAbsolute(calloutWithBox(e,b));assert.deepEqual(plain(r.points[0]),tip);assert.deepEqual(plain(r.points[2]),[-80,105]);assert.deepEqual(plain(r.points[1]),[-56,105])});
+test('nearest center uses Euclidean distance and threshold rather than bbox edges',()=>{const anchors=[{point:[180,250],label:'circle'},{point:[300,140],label:'ellipse'}];assert.equal(nearestCenterAnchor([183,254],anchors,8).label,'circle');assert.equal(nearestCenterAnchor([297,142],anchors,4).label,'ellipse');assert.equal(nearestCenterAnchor([188,258],anchors,8),null);assert.equal(nearestCenterAnchor([100,250],anchors,8),null);assert.equal(nearestCenterAnchor([180,250],[],8),null)});

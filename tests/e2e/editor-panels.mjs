@@ -39,3 +39,11 @@ export async function placeDefaultLine(page){
  const d=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue()),size=await page.locator('#device').evaluate(n=>[n.clientWidth,n.clientHeight]),cx=size[0]/2,cy=size[1]/2,curved=['polyline','curve'].includes(type),pts=curved?[[cx-120,cy+60],[cx,cy-60],[cx+120,cy+60]]:[[cx-120,cy-40],[cx+120,cy+40]];
  for(const [x,y]of pts)await page.mouse.click(d.x+(x+2)*z,d.y+(y+2)*z);await page.keyboard.press('Enter');await page.keyboard.press('Escape');
 }
+
+// Follow the compact toolbar's visible menu before invoking its existing action.
+export async function openToolbarControl(locator){
+ const menu=locator.locator('xpath=ancestor::details[@data-toolbar-menu]');
+ if(await menu.count()&&!await menu.evaluate(n=>n.open))await menu.locator(':scope > summary').click();
+}
+export async function clickToolbar(locator,options){await openToolbarControl(locator);await locator.click(options)}
+export async function selectToolbar(locator,value){await openToolbarControl(locator);await locator.selectOption(value)}

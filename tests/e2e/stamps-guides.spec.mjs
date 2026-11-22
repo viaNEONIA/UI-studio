@@ -1,3 +1,4 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {createCanvas} from '@napi-rs/canvas';
 import {confirmTwoPointDraft,placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
@@ -6,7 +7,7 @@ import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
 const image=name=>{if(name!=='plan.png')return {name,mimeType:'image/png',buffer:png};const canvas=createCanvas(500,700),ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,500,700);return {name,mimeType:'image/png',buffer:canvas.toBuffer('image/png')}};
-async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
+async function saved(page){const wait=page.waitForEvent('download');await clickToolbar(page.locator('#saveJson'));return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function load(page,p){await page.locator('#file').setInputFiles({name:'project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))})}
 async function guide(page,axis,pos){await page.locator('#guideAxis').selectOption(axis);await page.locator('#guidePosition').fill(String(pos));await page.locator('#addGuide').click()}
 async function drag(page,locator,dx,dy,modifiers=[]){const b=await locator.boundingBox();for(const m of modifiers)await page.keyboard.down(m);await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+dx,b.y+b.height/2+dy,{steps:8});await page.mouse.up();for(const m of modifiers)await page.keyboard.up(m)}
@@ -37,8 +38,8 @@ test('polyline point deletion has a two point minimum and line insertion preserv
 test('guidelines persist per page, delete individually and all, and stay out of HTML and raster exports',async({page})=>{
  await guide(page,'h',120);await guide(page,'v',160);await expect(page.locator('.construction-guides line')).toHaveCount(2);const before=await saved(page);await page.getByRole('button',{name:'補助線 1 を削除',exact:true}).click();await expect(page.locator('.construction-guides line')).toHaveCount(1);await page.locator('#undo').click();await expect(page.locator('.construction-guides line')).toHaveCount(2);
  await page.locator('#newScreen').click();await guide(page,'h',200);await page.locator('#clearGuides').click();expect((await saved(page)).screens[0].guidelines).toHaveLength(2);await expect(page.locator('.construction-guides line')).toHaveCount(0);await load(page,before);expect(await saved(page)).toEqual(before);
- const download=page.waitForEvent('download');await page.locator('#exportHtml').click();const html=await readFile(await(await download).path(),'utf8');expect(html).not.toContain('construction-guides');
- await page.evaluate(()=>{window.guideRasterCounts=[];window.MeetingTools.raster=async host=>{window.guideRasterCounts.push(host.querySelectorAll('.construction-guides').length);return document.createElement('canvas').toDataURL('image/png')}});const pdf=page.waitForEvent('download');await page.locator('#exportPdf').click();await pdf;expect(await page.evaluate(()=>window.guideRasterCounts)).toEqual([]);
+ const download=page.waitForEvent('download');await clickToolbar(page.locator('#exportHtml'));const html=await readFile(await(await download).path(),'utf8');expect(html).not.toContain('construction-guides');
+ await page.evaluate(()=>{window.guideRasterCounts=[];window.MeetingTools.raster=async host=>{window.guideRasterCounts.push(host.querySelectorAll('.construction-guides').length);return document.createElement('canvas').toDataURL('image/png')}});const pdf=page.waitForEvent('download');await clickToolbar(page.locator('#exportPdf'));await pdf;expect(await page.evaluate(()=>window.guideRasterCounts)).toEqual([]);
 });
 test('two-click angled guide is a segment and endpoint Ctrl snapping favors guide intersection',async({page})=>{
  await page.locator('#drawGuide').click();const r=await page.locator('#device').boundingBox();await page.mouse.click(r.x+60,r.y+80);await confirmTwoPointDraft(page);await page.mouse.click(r.x+120,r.y+140);await confirmTwoPointDraft(page);await expect(page.locator('.construction-guides line')).toHaveCount(1);const p=await saved(page);expect(p.screens[0].elements).toHaveLength(0);expect(p.screens[0].guidelines).toHaveLength(1);expect(p.screens[0].guidelines[0].dx).toBeCloseTo(p.screens[0].guidelines[0].dy);const line=page.locator('.construction-guides line');expect(Number(await line.getAttribute('x1'))).toBeCloseTo(p.screens[0].guidelines[0].x);expect(p.screens[0].guidelines[0].segment).toBe(true);

@@ -1,17 +1,18 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {createCanvas} from '@napi-rs/canvas';
 import {placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
-async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
+async function saved(page){const wait=page.waitForEvent('download');await clickToolbar(page.locator('#saveJson'));return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function add(page,name){await page.locator('#components button').getByText(name,{exact:true}).click();await placePendingObject(page);await placeDefaultLine(page)}
 async function slider(page,id,from,to){const range=page.locator(id);await range.scrollIntoViewIfNeeded();const b=await range.boundingBox();const x=f=>b.x+8+(b.width-16)*f,y=b.y+b.height/2;await page.mouse.move(x(from),y);await page.mouse.down();await page.mouse.move(x(to),y,{steps:12});return async()=>page.mouse.up()}
 const dialog=page=>page.locator('#textEditDialog');
 test.beforeEach(async({page})=>{await page.goto('/');await expandEditorPanels(page)});
 test('double-click text edits multiline Japanese, fits the background without moving and supports undo, JSON and HTML',async({page})=>{
  await add(page,'テキスト');const before=await saved(page);await page.locator('.element').dblclick();await expect(dialog(page)).toBeVisible();await expect(page.locator('#objectTextEditor')).toBeFocused();await page.locator('#objectTextEditor').fill('会議の確認事項\n日本語を入力');await page.locator('#commitObjectText').click();await expect(dialog(page)).not.toBeVisible();const after=await saved(page);expect(after.screens[0].elements[0].h).toBeGreaterThan(before.screens[0].elements[0].h);expect({...after.screens[0].elements[0],w:before.screens[0].elements[0].w,h:before.screens[0].elements[0].h}).toEqual({...before.screens[0].elements[0],text:'会議の確認事項\n日本語を入力',updatedAt:after.screens[0].elements[0].updatedAt});expect(Date.parse(after.screens[0].elements[0].updatedAt)).toBeGreaterThanOrEqual(Date.parse(before.screens[0].elements[0].updatedAt));await page.locator('#undo').click();expect(await saved(page)).toEqual(before);await page.locator('#redo').click();expect(await saved(page)).toEqual(after);
- await page.locator('#file').setInputFiles({name:'edited.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(after))});await expect(page.locator('.element')).toContainText('日本語を入力');const wait=page.waitForEvent('download');await page.locator('#exportHtml').click();const html=await readFile(await(await wait).path(),'utf8');expect(html).toContain('会議の確認事項\n日本語を入力');
+ await page.locator('#file').setInputFiles({name:'edited.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(after))});await expect(page.locator('.element')).toContainText('日本語を入力');const wait=page.waitForEvent('download');await clickToolbar(page.locator('#exportHtml'));const html=await readFile(await(await wait).path(),'utf8');expect(html).toContain('会議の確認事項\n日本語を入力');
 });
 test('empty shape text uses Ctrl Enter to commit; cancelling and unchanged commit do not add undo',async({page})=>{
  await page.locator('#addBox').click();await placePendingObject(page);await page.locator('.element').dblclick();await page.locator('#objectTextEditor').fill('四角内の文字');await page.keyboard.press('Control+Enter');await expect(page.locator('.element')).toContainText('四角内の文字');const before=await saved(page);await page.locator('.element').dblclick();await page.locator('#objectTextEditor').fill('破棄');await page.keyboard.press('Escape');expect(await saved(page)).toEqual(before);await page.locator('.element').dblclick();await page.locator('#cancelObjectText').click();expect(await saved(page)).toEqual(before);await page.locator('.element').dblclick();await page.locator('#commitObjectText').click();await page.locator('#undo').click();expect((await saved(page)).screens[0].elements[0].text).toBe('');

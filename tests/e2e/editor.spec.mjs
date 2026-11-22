@@ -1,3 +1,4 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {confirmTwoPointDraft,placeDefaultLine} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
@@ -6,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 const element = (id, x=20) => ({ id, type:'button', name:'ダミー', x, y:40, w:100, h:48, text:'テスト', bg:'#2563eb', color:'#ffffff', font:16, radius:9, css:'', link:'' });
 const project = (elements=[element('a')]) => ({version:1,width:412,height:915,screens:[{id:'s1',name:'ホーム',elements}]});
 async function load(page, data) { await page.locator('#file').setInputFiles({name:'dummy.json', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(data))}); }
-async function download(page, id) { const pending=page.waitForEvent('download'); await page.locator(id).click(); return readFile(await (await pending).path(), 'utf8'); }
+async function download(page, id) { const pending=page.waitForEvent('download'); await clickToolbar(page.locator(id)); return readFile(await (await pending).path(), 'utf8'); }
 async function saved(page) {return JSON.parse(await download(page,'#saveJson'));}
 async function move(page, locator, dx, dy) {const r=await locator.boundingBox();await page.mouse.move(r.x+5,r.y+5);await page.mouse.down();await page.mouse.move(r.x+5+dx*.65,r.y+5+dy*.65,{steps:5});await page.mouse.up();}
 test.beforeEach(async ({page}, testInfo) => {if(process.env.BASELINE && /group at edge|invalid import|export escapes/.test(testInfo.title))test.fail(true,'Original v0.6 regression reproduction');await page.goto('/');await expandEditorPanels(page);});
@@ -122,7 +123,7 @@ test('draw polyline and curve, adjust stroke palette and export SVG',async({page
  const html=await download(page,'#exportHtml');await page.setContent(html);await expect(page.locator('svg')).toHaveCount(2);await expect(page.locator('svg g').first()).toHaveAttribute('stroke','#ef4444');
 });
 test('straight line and arrow finish at two points, undo and cancellation',async({page})=>{
- const r=await page.locator('#device').boundingBox();for(const [id,y]of [['drawLine',80],['drawArrow',200]]){await page.locator('#'+id).click();await placePendingObject(page);await page.mouse.click(r.x+30,r.y+y);await confirmTwoPointDraft(page);await page.mouse.click(r.x+180,r.y+y+30);await confirmTwoPointDraft(page)}
+ const r=await page.locator('#device').boundingBox();for(const [id,y]of [['drawLine',80],['drawArrow',200]]){await clickToolbar(page.locator('#'+id));await placePendingObject(page);await page.mouse.click(r.x+30,r.y+y);await confirmTwoPointDraft(page);await page.mouse.click(r.x+180,r.y+y+30);await confirmTwoPointDraft(page)}
  await expect(page.locator('.element')).toHaveCount(2);await expect(page.locator('.element').last().locator('svg g path')).toHaveCount(2);
  await page.locator('#undo').click();await expect(page.locator('.element')).toHaveCount(1);await page.locator('#redo').click();await expect(page.locator('.element')).toHaveCount(2);
  await page.locator('#drawPolyline').click();await page.mouse.click(r.x+30,r.y+300);await confirmTwoPointDraft(page);await page.locator('#cancelDrawing').click();await expect(page.locator('.drawing-preview')).toHaveCount(0);await expect(page.locator('.element')).toHaveCount(2);

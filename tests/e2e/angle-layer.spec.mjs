@@ -1,8 +1,9 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {confirmTwoPointDraft,freezePendingPlacement} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
-async function saved(page){const wait=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
+async function saved(page){const wait=page.waitForEvent('download');await clickToolbar(page.locator('#saveJson'));return JSON.parse(await readFile(await(await wait).path(),'utf8'))}
 async function point(page,x,y){const r=await page.locator('#device').boundingBox(),z=Number(await page.locator('#zoom').inputValue());return {x:r.x+(x+2)*z,y:r.y+(y+2)*z}}
 async function clickPoint(page,x,y){const p=await point(page,x,y);await page.mouse.click(p.x,p.y);await confirmTwoPointDraft(page)}
 async function movePoint(page,x,y){const p=await point(page,x,y);await page.mouse.move(p.x,p.y,{steps:8})}

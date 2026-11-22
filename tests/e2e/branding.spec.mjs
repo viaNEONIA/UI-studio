@@ -1,10 +1,11 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {placePendingObject} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import JSZip from 'jszip';
 import {enterEditor,expandEditorPanels} from './editor-panels.mjs';
 const legacy={version:1,width:320,height:200,screens:[{id:'old',name:'旧データ',elements:[{id:'old-box',type:'box',name:'確認事項',x:20,y:20,w:120,h:80,text:'引継ぎ確認',bg:'#dbeafe',color:'#172235',font:16,radius:0}]}]};
-async function download(page,id){const wait=page.waitForEvent('download');await page.locator(id).click();const d=await wait;return{name:d.suggestedFilename(),bytes:await readFile(await d.path())}}
+async function download(page,id){const wait=page.waitForEvent('download');await clickToolbar(page.locator(id));const d=await wait;return{name:d.suggestedFilename(),bytes:await readFile(await d.path())}}
 async function load(page,p=legacy){await page.locator('#file').setInputFiles({name:'ui-studio-project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))})}
 test('editor and HTML preview use the new name and legacy JSON still round trips unchanged',async({page},info)=>{
  await page.goto('/');await expect(page).toHaveTitle('会議ノート v0.6');await enterEditor(page);await expect(page.locator('.brand')).toContainText('会議ノート');await expect(page.locator('.brand')).not.toContainText('UI Studio');await load(page);const json=await download(page,'#saveJson');expect(json.name).toBe('会議ノート.json');expect(JSON.parse(json.bytes.toString())).toEqual(legacy);const html=await download(page,'#exportHtml');expect(html.name).toBe('会議ノート-閲覧用.html');expect(html.bytes.toString()).toContain('<title>会議ノート — 閲覧用</title>');await page.screenshot({path:info.outputPath('kaigi-note-editor.png')});

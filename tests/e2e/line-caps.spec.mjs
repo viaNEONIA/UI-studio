@@ -1,8 +1,9 @@
+import {clickToolbar} from './editor-panels.mjs';
 import {confirmTwoPointDraft} from './editor-panels.mjs';
 import {expandEditorPanels} from './editor-panels.mjs';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
-async function saved(page){const waiting=page.waitForEvent('download');await page.locator('#saveJson').click();return JSON.parse(await readFile(await(await waiting).path(),'utf8'))}
+async function saved(page){const waiting=page.waitForEvent('download');await clickToolbar(page.locator('#saveJson'));return JSON.parse(await readFile(await(await waiting).path(),'utf8'))}
 const project=(type='line',extra={})=>({version:1,width:412,height:915,screens:[{id:'s',name:'線',elements:[{id:'line',type,name:'線',x:50,y:80,w:180,h:20,text:'',bg:'transparent',color:'#172235',font:16,radius:0,stroke:'#172235',strokeWidth:3,points:[[0,0],[1,0]],...extra}]}]});
 async function load(page,p){await page.locator('#file').setInputFiles({name:'line.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await page.locator('#layers .layer').click()}
 async function preview(page){return page.locator('.drawing-preview polyline').evaluate(n=>[...n.points].map(p=>[p.x,p.y]))}
@@ -15,7 +16,7 @@ test('holding Shift snaps live preview and release restores free movement before
 test('both endpoint styles persist through undo, JSON and HTML; legacy arrows keep their head',async({page})=>{
  await load(page,project());await page.locator('#pStartCap').selectOption('circle');await page.locator('#pEndCap').selectOption('arrow');await expect(page.locator('[data-cap-start]')).toHaveAttribute('data-cap-start','circle');await expect(page.locator('[data-cap-end]')).toHaveAttribute('data-cap-end','arrow');const p=await saved(page);
  await page.locator('#undo').click();await expect(page.locator('[data-cap-start]')).toHaveCount(1);await expect(page.locator('[data-cap-end]')).toHaveCount(0);await page.locator('#redo').click();expect(await saved(page)).toEqual(p);await load(page,p);await expect(page.locator('#pStartCap')).toHaveValue('circle');await expect(page.locator('#pEndCap')).toHaveValue('arrow');
- const waiting=page.waitForEvent('download');await page.locator('#exportHtml').click();const html=await readFile(await(await waiting).path(),'utf8');await page.setContent(html);await expect(page.locator('[data-cap-start]')).toHaveCount(1);await expect(page.locator('[data-cap-end]')).toHaveCount(1);
+ const waiting=page.waitForEvent('download');await clickToolbar(page.locator('#exportHtml'));const html=await readFile(await(await waiting).path(),'utf8');await page.setContent(html);await expect(page.locator('[data-cap-start]')).toHaveCount(1);await expect(page.locator('[data-cap-end]')).toHaveCount(1);
  await page.goto('/');await expandEditorPanels(page);await load(page,project('arrow'));await expect(page.locator('#pEndCap')).toHaveValue('arrow');await page.locator('#pEndCap').selectOption('none');await expect(page.locator('[data-cap-end]')).toHaveCount(0);
 });
 test('Shift endpoint drag keeps the opposite endpoint fixed and locked lines resist cap changes',async({page})=>{

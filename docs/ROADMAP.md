@@ -9,6 +9,6 @@
 | --- | --- |
 | フロー図専用パレット | 一般の図形・矢印とは別の専用ツール群 |
 
-HTMLスライドの静的読込・独立した注釈編集・AI指示JSON出力は `feat/html-slide-annotations` に実装し、この未実装一覧から除外しました。mainへの統合前です。操作・対応範囲は[README](../README.md)、形式は[AI指示JSON仕様](AI_INSTRUCTIONS_JSON.md)を参照してください。
+HTMLスライドの静的読込・独立した注釈編集・AI指示JSON出力は PR #44でmainに統合済みのため、この未実装一覧から除外しました。操作・対応範囲は[README](../README.md)、形式は[AI指示JSON仕様](AI_INSTRUCTIONS_JSON.md)を参照してください。
 
 実装時期・優先順位は未定です。
