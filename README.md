@@ -8,7 +8,7 @@ PDFの図面に線・図形・文字を書き込み、会議中の確認事項�
 
 ## 最新の実装とブランチ
 
-2026年11月22日（日本時間）更新。`main` にはPR [#44](https://github.com/viaNEONIA/UI-studio/pull/44)のHTMLスライド静的取込・注釈編集・AI指示JSON出力まで反映済みです。`feat/compact-toolbar-callout-centers` では、承認済みラフに沿った右上への操作集約、引き出し線付きテキストの文字枠リサイズ、円・楕円の中心表示と中心スナップを追加しています。この開発ブランチはmain未統合です。
+2026年11月22日（日本時間）更新。`main` にはPR [#44](https://github.com/viaNEONIA/UI-studio/pull/44)のHTMLスライド静的取込・注釈編集・AI指示JSON出力まで反映済みです。PR [#45](https://github.com/viaNEONIA/UI-studio/pull/45)の `feat/compact-toolbar-callout-centers` では、承認済みラフに沿った右上への操作集約、引き出し線付きテキストの文字枠リサイズ、円・楕円の中心表示と中心スナップを追加しています。この開発ブランチはmain未統合です。
 
 | 対象 | 状態・内容 |
 | --- | --- |
