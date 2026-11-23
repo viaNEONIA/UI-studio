@@ -1,6 +1,6 @@
 # ブランチ情報
 
-確認日：2026年11月22日（日本時間）
+確認日：2026年11月23日（日本時間）
 
 これは確認時点の一覧です。最新の状態は[ブランチ一覧](https://github.com/viaNEONIA/UI-studio/branches)と[オープンPR](https://github.com/viaNEONIA/UI-studio/pulls)を参照してください。
 
@@ -8,10 +8,10 @@
 
 | 対象 | 確認時点の状態 |
 | --- | --- |
-| `main` | `3d1064989c12fb8e0969f21530986be4fd0cdbe4`。PR #44まで統合済み |
-| `latest-dev` | 配布用タグ。PR #44の統合後の配布状況はReleaseを確認。ブランチではない |
+| `main` | `8916cef5b007f8ff8747ae4be97bef01b497a865`。PR #45まで統合済み |
+| `latest-dev` | 確認時点でmainと同じ `8916cef` を指す配布用タグ。ブランチではない |
 | `feat/html-slide-annotations` | [PR #44](https://github.com/viaNEONIA/UI-studio/pull/44)でmainへ統合済み |
-| `feat/compact-toolbar-callout-centers` | `3d10649`を起点に右上メニュー集約・文字枠の四隅リサイズ・円の中心表示とスナップを追加。main未統合 |
+| `feat/compact-toolbar-callout-centers` | 右上メニュー集約・文字枠の四隅リサイズ・円の中心表示とスナップ。[PR #45](https://github.com/viaNEONIA/UI-studio/pull/45)でmainへ統合済み |
 
 新しい開発はmainを起点にします。残存する過去のブランチ名から最新の機能や未完了作業を判断しないでください。
 
@@ -44,6 +44,9 @@
 | [`fix/v06-audit-playwright`](https://github.com/viaNEONIA/UI-studio/tree/fix/v06-audit-playwright) | [`d0a14e2`](https://github.com/viaNEONIA/UI-studio/commit/d0a14e2853a64367af9810a2c3ebfe7481b21420) | mainへ統合済み（未統合コミット0件） |
 
 ## 最近統合したPR
+
+- [#45](https://github.com/viaNEONIA/UI-studio/pull/45)：`feat/compact-toolbar-callout-centers` → main。先端`a8c4b9b`、マージ`8916cef`（2026年11月22日）。
+- [#44](https://github.com/viaNEONIA/UI-studio/pull/44)：HTMLスライド取込・注釈編集・AI指示JSONをmainへ統合。マージ`3d10649`。
 
 - [#39](https://github.com/viaNEONIA/UI-studio/pull/39)：`feat/named-saves-callout-metadata` → main。先端`17ad12e`、マージ`0acb08c`。元ブランチは確認時点のリモート一覧に存在しない。
 - [#38](https://github.com/viaNEONIA/UI-studio/pull/38)：`feat/workflow-pdf-fixes` → main。先端`93f53b0`、マージ`a8a2231`。元ブランチは残存。
