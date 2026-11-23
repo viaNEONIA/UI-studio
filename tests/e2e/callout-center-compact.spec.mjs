@@ -34,3 +34,11 @@ test('center display settings never change note or raster/HTML exports and cente
 test('circle movement prefers the actual center over a closer bbox edge of the target',async({page})=>{
  await load(page,fixture([circle('moving',80,100),object('narrow-target','box',396,346,8,8)]));const z=Number(await page.locator('#zoom').inputValue());await drag(page,page.locator('.element[data-id=moving]'),(407-120)*z,(350-140)*z);const e=(await save(page)).screens[0].elements[0];expect(e.x+e.w/2).toBeCloseTo(400);expect(e.y+e.h/2).toBeCloseTo(350);
 });
+test('PDF toolbar instructions expose axis guides and stamp with drawing keys only',async({page},info)=>{
+ await page.setViewportSize({width:1440,height:765});
+ for(const id of ['quickGuideV','quickGuideH','quickStamp']){await expect(page.locator('#quickTools #'+id)).toBeVisible();await expect(page.locator('#'+id)).toHaveCount(1)}
+ const keys=page.locator('#drawingShortcutKeys');await expect(keys).toBeVisible();await expect(keys).toContainText('水平補助線');await expect(keys).toContainText('垂直補助線');await expect(keys.locator('kbd')).toHaveText(['S','T','R','O','Y','L','A','P','C','Shift+U','G','H','V','F','Q','M']);
+ await page.locator('#quickGuideV').click();await expect(page.locator('#device')).toHaveAttribute('data-drawing-type','axisGuide');await page.keyboard.press('Escape');await page.locator('#quickGuideH').click();await expect(page.locator('#device')).toHaveAttribute('data-drawing-type','axisGuide');await page.keyboard.press('Escape');if(await page.locator('#stampTools').evaluate(n=>n.open))await page.locator('#quickStamp').click();await page.locator('#quickStamp').click();await expect(page.locator('#stampTools')).toHaveAttribute('open','');
+ for(const width of [1280,1440,1920]){await page.setViewportSize({width,height:765});expect(await page.locator('.top').evaluate(n=>n.scrollWidth<=n.clientWidth)).toBe(true);await expect(keys).toBeVisible()}
+ await page.setViewportSize({width:1440,height:765});await page.screenshot({path:info.outputPath('pdf-toolbar-instructions.png')});
+});
